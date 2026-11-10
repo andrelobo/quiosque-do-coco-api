@@ -26,19 +26,32 @@ export class ProductsService {
     return product.save();
   }
 
+  // Os .lean() não trazem o virtual availableQty, então calculamos aqui.
+  private withAvailable<T extends { stockQty?: number; reservedQty?: number }>(product: T) {
+    return {
+      ...product,
+      availableQty: (product.stockQty ?? 0) - (product.reservedQty ?? 0),
+    };
+  }
+
   async findAll(includeInactive = false) {
     const filter = includeInactive ? {} : { active: true };
-    return this.productModel.find(filter).sort({ category: 1, name: 1 }).lean({ virtuals: true });
+    const products = await this.productModel
+      .find(filter)
+      .sort({ category: 1, name: 1 })
+      .lean();
+    return products.map((product) => this.withAvailable(product));
   }
 
   async findById(id: string) {
-    const product = await this.productModel.findById(id).lean({ virtuals: true });
+    const product = await this.productModel.findById(id).lean();
     if (!product) throw new NotFoundException('Produto não encontrado');
-    return product;
+    return this.withAvailable(product);
   }
 
   async findByCategory(category: ProductCategory) {
-    return this.productModel.find({ category, active: true }).lean({ virtuals: true });
+    const products = await this.productModel.find({ category, active: true }).lean();
+    return products.map((product) => this.withAvailable(product));
   }
 
   async update(id: string, data: Partial<Product>) {
