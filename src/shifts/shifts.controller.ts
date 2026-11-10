@@ -20,10 +20,15 @@ export class ShiftsController {
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
   @ApiOperation({ summary: 'Abrir turno' })
   open(@Body() dto: OpenShiftDto, @Req() req: any) {
+    // Filtrar apenas ObjectIds válidos (24 chars hex)
+    const validProductIds = (dto.productIds || [])
+      .filter((id): id is string => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id))
+      .map((id) => new Types.ObjectId(id));
+
     return this.shiftsService.open({
       openedBy: new Types.ObjectId(req.user.userId),
       initialCash: dto.initialCash,
-      productIds: dto.productIds.map((id) => new Types.ObjectId(id)),
+      productIds: validProductIds,
     });
   }
 
