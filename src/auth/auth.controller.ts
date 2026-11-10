@@ -2,6 +2,7 @@ import { Controller, Post, Body, Get, Req, Res, UseGuards, HttpCode } from '@nes
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CookieOptions, Response } from 'express';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UserRole } from '../users/user.schema';
 import { Roles } from './roles.decorator';
@@ -21,7 +22,10 @@ const authCookieOptions = (): CookieOptions => {
 @ApiTags('Autenticação')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('login')
   @HttpCode(200)
@@ -52,8 +56,17 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Usuário logado' })
-  me(@Req() req: any) {
-    return req.user;
+  async me(@Req() req: any) {
+    const user = await this.usersService.findById(req.user.userId);
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        active: user.active,
+      },
+    };
   }
 
   @Post('register')

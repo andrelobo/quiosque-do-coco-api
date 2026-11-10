@@ -4,6 +4,15 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument, UserRole } from './user.schema';
 
+// Formato público do usuário (sem hash de senha), usado nas respostas da API.
+export interface PublicUser {
+  id: string;
+  name: string;
+  username: string;
+  role: UserRole;
+  active: boolean;
+}
+
 @Injectable()
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
@@ -20,10 +29,17 @@ export class UsersService {
     return this.userModel.find({ active: true }).select('-passwordHash').lean();
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<PublicUser> {
     const user = await this.userModel.findById(id).select('-passwordHash').lean();
     if (!user) throw new NotFoundException('Usuário não encontrado');
-    return user;
+    // Documentos .lean() não têm o virtual `id`, então montamos o objeto.
+    return {
+      id: String(user._id),
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      active: user.active,
+    };
   }
 
   async findByUsername(username: string) {
