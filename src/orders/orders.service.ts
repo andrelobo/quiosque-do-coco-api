@@ -132,9 +132,16 @@ export class OrdersService {
     return this.orderModel.find(filter).populate('items.product').sort({ createdAt: -1 }).lean();
   }
 
-  async findAll(status?: OrderStatus, page = 1, limit = 10) {
+  async findAll(status?: OrderStatus, page = 1, limit = 10, search?: string) {
     const filter: any = {};
     if (status) filter.status = status;
+    if (search) {
+      filter.$or = [
+        { code: { $regex: search, $options: 'i' } },
+        { dayKey: { $regex: search, $options: 'i' } },
+        { pickupName: { $regex: search, $options: 'i' } },
+      ];
+    }
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.orderModel.find(filter).populate('items.product').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),

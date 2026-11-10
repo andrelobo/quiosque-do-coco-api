@@ -37,12 +37,13 @@ export class OrdersController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
-  @ApiOperation({ summary: 'Listar todos os pedidos (com paginação)' })
+  @ApiOperation({ summary: 'Listar todos os pedidos (com paginação e busca)' })
   @ApiQuery({ name: 'status', required: false, enum: OrderStatus })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
-  findAll(@Query('status') status?: OrderStatus, @Query('page') page = 1, @Query('limit') limit = 10) {
-    return this.ordersService.findAll(status, Number(page), Number(limit));
+  @ApiQuery({ name: 'search', required: false, type: String, example: '123' })
+  findAll(@Query('status') status?: OrderStatus, @Query('page') page = 1, @Query('limit') limit = 10, @Query('search') search?: string) {
+    return this.ordersService.findAll(status, Number(page), Number(limit), search);
   }
 
   @Get('shift/:shiftId')
