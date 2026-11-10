@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Payment, PaymentDocument, PaymentMethod, PaymentStatus, CardType } from './payment.schema';
 import { Order, OrderDocument, OrderStatus } from '../orders/order.schema';
 import { Shift, ShiftDocument } from '../shifts/shift.schema';
 import { AuditLog, AuditLogDocument } from '../common/audit/audit.schema';
+import { OrdersService } from '../orders/orders.service';
 
 @Injectable()
 export class PaymentsService {
@@ -13,6 +14,8 @@ export class PaymentsService {
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(Shift.name) private shiftModel: Model<ShiftDocument>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLogDocument>,
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService,
   ) {}
 
   async create(data: {
@@ -87,6 +90,14 @@ export class PaymentsService {
       order: payment.order,
       method: payment.method,
     });
+
+    // Com o pagamento confirmado, libera o pedido (pago -> preparo/entrega).
+    try {
+      await this.ordersService.confirmPayment(String(payment.order), userId);
+    } catch (error) {
+      // Pagamento parcial ou pedido em outro status: segue o fluxo normal.
+      if (!(error instanceof BadRequestException)) throw error;
+    }
 
     return payment;
   }
