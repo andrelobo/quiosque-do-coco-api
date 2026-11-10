@@ -1,0 +1,15 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+coverage/
+
+# Ambiente e segredos
+.env
+.env.local
+.env.*.local
+
+# Logs e temporários
+*.log
+.DS_Store
