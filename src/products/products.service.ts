@@ -30,11 +30,12 @@ export class ProductsService {
   }
 
   // Os .lean() não trazem o virtual availableQty, então calculamos aqui.
-  // Também converte _id (ObjectId) para id (string) para o frontend
+  // Também converte _id (ObjectId) para id (string) e REMOVE _id para evitar React error #31
   private withAvailable<T extends { stockQty?: number; reservedQty?: number; _id?: any }>(product: T) {
+    const { _id, ...rest } = product;
     return {
-      ...product,
-      id: product._id?.toString?.() ?? product._id,
+      ...rest,
+      id: _id?.toString?.() ?? _id,
       availableQty: (product.stockQty ?? 0) - (product.reservedQty ?? 0),
     };
   }

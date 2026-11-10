@@ -16,7 +16,7 @@ const isSerializedObjectId = (value: any): boolean =>
  * - converte ObjectId em string (inclui ObjectId serializado com {buffer});
  * - expõe `id` a partir de `_id` (os .lean() do Mongoose não têm o virtual id);
  * - aplica os virtuals dos documentos Mongoose (ex.: availableQty);
- * - remove `__v`.
+ * - remove `__v` e `_id`.
  *
  * Sem isso o frontend (que usa `id`) não consegue editar/excluir registros.
  */
@@ -34,11 +34,12 @@ function transform(value: any, depth = 0): any {
 
   const result: Record<string, any> = {};
   for (const [key, item] of Object.entries(value)) {
-    if (key === '__v') continue;
+    if (key === '__v' || key === '_id') continue;
     result[key] = transform(item, depth + 1);
   }
-  if (result._id !== undefined && result.id === undefined) {
-    result.id = String(result._id);
+  // Garante que _id nunca vazze na resposta (converte para id se existir no valor original)
+  if (value._id !== undefined && result.id === undefined) {
+    result.id = String(value._id);
   }
   return result;
 }
