@@ -14,8 +14,16 @@ cd "$APP_DIR"
 echo "📥 Atualizando código..."
 git pull --ff-only
 
-echo "📋 Copiando .env.production para .env..."
-cp .env.production .env
+# O .env NÃO é versionado: ele vive apenas na VPS, com os valores reais
+# (MongoDB Atlas, JWT_SECRET, FRONTEND_URL). O repo versiona só .env.example.
+if [ ! -f .env ]; then
+  echo "❌ .env não encontrado em $APP_DIR"
+  echo "   Crie a partir de .env.example e preencha os segredos reais."
+  exit 1
+fi
+if grep -qx 'JWT_SECRET=dev-secret-change-in-production' .env; then
+  echo "⚠️  JWT_SECRET ainda é o valor de exemplo. Rotacione antes de expor a API."
+fi
 
 echo "🔨 Build e restart do container..."
 docker compose build api

@@ -6,9 +6,10 @@ dist/
 coverage/
 
 # Ambiente e segredos
+# Somente .env.example é versionado. Todos os demais .env* ficam fora do repo.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Logs e temporários
 *.log
