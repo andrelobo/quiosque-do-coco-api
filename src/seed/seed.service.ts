@@ -13,6 +13,14 @@ export class SeedService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Em produção o seed automático fica desligado para nunca criar
+    // usuários com senhas padrão (admin/admin123). Use `npm run seed:full`
+    // de forma explícita (ou SEED_ON_BOOT=true numa primeira subida).
+    if (process.env.SEED_ON_BOOT === 'false') return;
+    if (process.env.NODE_ENV === 'production' && process.env.SEED_ON_BOOT !== 'true') {
+      console.log('ℹ️  Seed automático desativado em produção.');
+      return;
+    }
     await this.seedUsers();
     await this.seedProducts();
   }

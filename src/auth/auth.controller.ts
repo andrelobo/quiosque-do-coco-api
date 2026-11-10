@@ -4,8 +4,6 @@ import { CookieOptions, Response } from 'express';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { UserRole } from '../users/user.schema';
-import { Roles } from './roles.decorator';
 
 // Em produção o web (Vercel) e a API (VPS) ficam em sites diferentes.
 // Cookies cross-site exigem SameSite=None + Secure.
@@ -67,14 +65,5 @@ export class AuthController {
         active: user.active,
       },
     };
-  }
-
-  @Post('register')
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Registrar usuário (apenas admin)' })
-  register(@Body() body: { name: string; username: string; password: string; role?: UserRole }) {
-    return this.authService.register(body);
   }
 }

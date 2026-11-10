@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument, OrderStatus, OrderItem } from './order.schema';
@@ -7,6 +7,7 @@ import { Shift, ShiftDocument, ShiftStatus } from '../shifts/shift.schema';
 import { Payment, PaymentDocument, PaymentStatus } from '../payments/payment.schema';
 import { StockMovement, StockMovementDocument, StockMovementType } from '../stock/stock.schema';
 import { AuditLog, AuditLogDocument } from '../common/audit/audit.schema';
+import { UserRole } from '../users/user.schema';
 
 interface ProductWithVirtual extends ProductDocument {
   availableQty: number;
@@ -307,26 +308,48 @@ export class OrdersService {
     if (order.status === OrderStatus.CANCELADO) {
       throw new BadRequestException('Pedido cancelado não pode ser entregue');
     }
+    // Só libera pedido pago (ou já em preparo/pronto). Nunca um pedido em
+    // edição/aguardando pagamento, para não baixar estoque sem recebimento.
+    const deliverable: OrderStatus[] = [OrderStatus.PAGO, OrderStatus.EM_PREPARO, OrderStatus.PRONTO];
+    if (!deliverable.includes(order.status)) {
+      throw new BadRequestException('Pedido precisa estar pago para ser entregue');
+    }
+    if (order.items.some((item) => item.trackStock) && !order.stockReserved) {
+      throw new BadRequestException('Pedido sem reserva de estoque: não é possível entregar');
+    }
 
     return this.processDelivery(order, userId);
   }
 
   private async processDelivery(order: OrderDocument, userId: Types.ObjectId) {
-    // Baixar estoque definitivo
+    // Baixar estoque definitivo. A reserva só é consumida se existir, e as
+    // atualizações são condicionais para impedir saldo negativo.
     for (const item of order.items) {
-      if (item.trackStock) {
-        await this.productModel.findByIdAndUpdate(item.product, {
-          $inc: { reservedQty: -item.qty, stockQty: -item.qty },
-        });
-        await this.createStockMovement({
-          product: item.product,
-          type: StockMovementType.SAIDA,
-          qty: item.qty,
-          order: order._id,
-          reason: `Entrega do pedido ${order.code}`,
-          user: userId,
-        });
+      if (!item.trackStock) continue;
+
+      const filter: Record<string, any> = {
+        _id: item.product,
+        stockQty: { $gte: item.qty },
+      };
+      const inc: Record<string, number> = { stockQty: -item.qty };
+      if (order.stockReserved) {
+        filter.reservedQty = { $gte: item.qty };
+        inc.reservedQty = -item.qty;
       }
+
+      const updated = await this.productModel.findOneAndUpdate(filter, { $inc: inc }, { new: true });
+      if (!updated) {
+        throw new ConflictException(`Estoque insuficiente para ${item.name} ao entregar`);
+      }
+
+      await this.createStockMovement({
+        product: item.product,
+        type: StockMovementType.SAIDA,
+        qty: item.qty,
+        order: order._id,
+        reason: `Entrega do pedido ${order.code}`,
+        user: userId,
+      });
     }
 
     order.status = OrderStatus.ENTREGUE;
@@ -339,7 +362,7 @@ export class OrdersService {
     return order.populate('items.product');
   }
 
-  async cancel(orderId: string, userId: Types.ObjectId, reason: string) {
+  async cancel(orderId: string, userId: Types.ObjectId, reason: string, role?: UserRole) {
     const order = await this.orderModel.findById(orderId);
     if (!order) throw new NotFoundException('Pedido não encontrado');
     if (order.status === OrderStatus.CANCELADO) {
@@ -347,6 +370,11 @@ export class OrdersService {
     }
     if (order.status === OrderStatus.ENTREGUE) {
       throw new BadRequestException('Pedido entregue não pode ser cancelado diretamente');
+    }
+    // Atendente só cancela antes do pagamento; depois disso exige responsável/admin.
+    const paidStatuses: OrderStatus[] = [OrderStatus.PAGO, OrderStatus.EM_PREPARO, OrderStatus.PRONTO];
+    if (paidStatuses.includes(order.status) && role === UserRole.ATENDENTE) {
+      throw new ForbiddenException('Cancelamento após pagamento exige responsável ou admin');
     }
 
     // Liberar reserva de estoque se houver

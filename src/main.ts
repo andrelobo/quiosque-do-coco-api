@@ -22,7 +22,10 @@ async function bootstrap() {
     new CurrencyTransformPipe(),
     new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }),
   );
-  app.useGlobalInterceptors(new TransformInterceptor(), new CurrencyResponseInterceptor());
+  // A ordem importa: o CurrencyResponseInterceptor é o mais externo e roda
+  // DEPOIS do TransformInterceptor, que já converteu documentos Mongoose em
+  // objetos simples e ObjectIds em string.
+  app.useGlobalInterceptors(new CurrencyResponseInterceptor(), new TransformInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Quiosque do Coco API')
