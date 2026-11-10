@@ -30,9 +30,11 @@ export class ProductsService {
   }
 
   // Os .lean() não trazem o virtual availableQty, então calculamos aqui.
-  private withAvailable<T extends { stockQty?: number; reservedQty?: number }>(product: T) {
+  // Também converte _id (ObjectId) para id (string) para o frontend
+  private withAvailable<T extends { stockQty?: number; reservedQty?: number; _id?: any }>(product: T) {
     return {
       ...product,
+      id: product._id?.toString?.() ?? product._id,
       availableQty: (product.stockQty ?? 0) - (product.reservedQty ?? 0),
     };
   }
