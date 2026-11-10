@@ -6,8 +6,14 @@ const isObjectId = (value: any): boolean =>
   !!value && typeof value === 'object' && typeof value.toHexString === 'function';
 
 /**
+ * Detecta se é um ObjectId serializado pelo Mongoose (tem propriedade buffer)
+ */
+const isSerializedObjectId = (value: any): boolean =>
+  !!value && typeof value === 'object' && 'buffer' in value && Buffer.isBuffer(value.buffer);
+
+/**
  * Normaliza as respostas da API:
- * - converte ObjectId em string;
+ * - converte ObjectId em string (inclui ObjectId serializado com {buffer});
  * - expõe `id` a partir de `_id` (os .lean() do Mongoose não têm o virtual id);
  * - aplica os virtuals dos documentos Mongoose (ex.: availableQty);
  * - remove `__v`.
@@ -18,6 +24,8 @@ function transform(value: any, depth = 0): any {
   if (depth > 12 || value === null || typeof value !== 'object') return value;
   if (value instanceof Date || Buffer.isBuffer(value)) return value;
   if (isObjectId(value)) return value.toString();
+  // ObjectId serializado pelo Mongoose: { buffer: <Buffer> }
+  if (isSerializedObjectId(value)) return value.toString();
   // Documento Mongoose: converte antes de iterar, senão vêm campos internos.
   if (typeof value.toObject === 'function') {
     return transform(value.toObject({ virtuals: true }), depth + 1);
