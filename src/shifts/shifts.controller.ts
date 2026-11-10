@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../users/user.schema';
+import { OpenShiftDto, CloseShiftDto } from './shifts.dto';
 
 @ApiTags('Turnos')
 @ApiBearerAuth()
@@ -18,11 +19,11 @@ export class ShiftsController {
   @Post('open')
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
   @ApiOperation({ summary: 'Abrir turno' })
-  open(@Body() body: { initialCashCents: number; productIds: string[] }, @Req() req: any) {
+  open(@Body() dto: OpenShiftDto, @Req() req: any) {
     return this.shiftsService.open({
       openedBy: new Types.ObjectId(req.user.userId),
-      initialCashCents: body.initialCashCents,
-      productIds: body.productIds.map((id) => new Types.ObjectId(id)),
+      initialCash: dto.initialCash,
+      productIds: dto.productIds.map((id) => new Types.ObjectId(id)),
     });
   }
 
@@ -66,14 +67,14 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Fechar turno' })
   close(
     @Param('id') id: string,
-    @Body() body: { countedCashCents: number; closingNotes?: string },
+    @Body() dto: CloseShiftDto,
     @Req() req: any,
   ) {
     return this.shiftsService.close({
       shiftId: id,
       closedBy: new Types.ObjectId(req.user.userId),
-      countedCashCents: body.countedCashCents,
-      closingNotes: body.closingNotes,
+      countedCash: dto.countedCash,
+      closingNotes: dto.closingNotes,
     });
   }
 }

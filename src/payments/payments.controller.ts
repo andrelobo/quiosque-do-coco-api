@@ -1,12 +1,13 @@
 import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
-import { PaymentMethod, PaymentStatus, CardType } from './payment.schema';
+import { PaymentMethod, CardType } from './payment.schema';
 import { Types } from 'mongoose';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../users/user.schema';
+import { CreatePaymentDto, RejectPaymentDto } from './payments.dto';
 
 @ApiTags('Pagamentos')
 @ApiBearerAuth()
@@ -18,23 +19,15 @@ export class PaymentsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
   @ApiOperation({ summary: 'Registrar pagamento (pendente)' })
-  create(@Body() body: {
-    orderId: string;
-    shiftId: string;
-    method: PaymentMethod;
-    amountCents: number;
-    receivedCents?: number;
-    cardType?: CardType;
-    reference?: string;
-  }, @Req() req: any) {
+  create(@Body() dto: CreatePaymentDto, @Req() req: any) {
     return this.paymentsService.create({
-      orderId: new Types.ObjectId(body.orderId),
-      shiftId: new Types.ObjectId(body.shiftId),
-      method: body.method,
-      amountCents: body.amountCents,
-      receivedCents: body.receivedCents,
-      cardType: body.cardType,
-      reference: body.reference,
+      orderId: new Types.ObjectId(dto.orderId),
+      shiftId: new Types.ObjectId(dto.shiftId),
+      method: dto.method,
+      amount: dto.amount,
+      received: dto.received,
+      cardType: dto.cardType,
+      reference: dto.reference,
       createdBy: req.user.userId,
     });
   }
@@ -69,7 +62,7 @@ export class PaymentsController {
   @Patch(':id/reject')
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
   @ApiOperation({ summary: 'Rejeitar pagamento (não confirmado)' })
-  reject(@Param('id') id: string, @Body() body: { reason: string }, @Req() req: any) {
-    return this.paymentsService.reject(id, req.user.userId, body.reason);
+  reject(@Param('id') id: string, @Body() dto: RejectPaymentDto, @Req() req: any) {
+    return this.paymentsService.reject(id, req.user.userId, dto.reason);
   }
 }

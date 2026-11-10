@@ -14,7 +14,7 @@ export class ProductsService {
   async create(data: {
     name: string;
     category: ProductCategory;
-    priceCents: number;
+    price: number; // já vem em centavos (pipe converte)
     unit?: string;
     requiresPrep?: boolean;
     trackStock?: boolean;
@@ -22,7 +22,10 @@ export class ProductsService {
   }) {
     const existing = await this.productModel.findOne({ name: data.name });
     if (existing) throw new ConflictException('Produto já existe');
-    const product = new this.productModel(data);
+    const product = new this.productModel({
+      ...data,
+      priceCents: data.price, // mapeia para o campo do schema
+    });
     return product.save();
   }
 
@@ -54,8 +57,22 @@ export class ProductsService {
     return products.map((product) => this.withAvailable(product));
   }
 
-  async update(id: string, data: Partial<Product>) {
-    const product = await this.productModel.findByIdAndUpdate(id, data, { new: true });
+  async update(id: string, data: Partial<{
+    name: string;
+    category: ProductCategory;
+    price: number; // já vem em centavos
+    unit: string;
+    active: boolean;
+    requiresPrep: boolean;
+    trackStock: boolean;
+    stockQty: number;
+  }>) {
+    const updateData: any = { ...data };
+    if (data.price !== undefined) {
+      updateData.priceCents = data.price;
+      delete updateData.price;
+    }
+    const product = await this.productModel.findByIdAndUpdate(id, updateData, { new: true });
     if (!product) throw new NotFoundException('Produto não encontrado');
     return product;
   }

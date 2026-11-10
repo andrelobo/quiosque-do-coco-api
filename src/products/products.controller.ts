@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../users/user.schema';
+import { CreateProductDto, UpdateProductDto, AdjustStockDto } from './products.dto';
 
 @ApiTags('Produtos')
 @ApiBearerAuth()
@@ -17,16 +18,16 @@ export class ProductsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
   @ApiOperation({ summary: 'Criar produto' })
-  create(@Body() body: {
-    name: string;
-    category: ProductCategory;
-    priceCents: number;
-    unit?: string;
-    requiresPrep?: boolean;
-    trackStock?: boolean;
-    stockQty?: number;
-  }) {
-    return this.productsService.create(body);
+  create(@Body() dto: CreateProductDto) {
+    return this.productsService.create({
+      name: dto.name,
+      category: dto.category as ProductCategory,
+      price: dto.price,
+      unit: dto.unit,
+      requiresPrep: dto.requiresPrep,
+      trackStock: dto.trackStock,
+      stockQty: dto.stockQty,
+    });
   }
 
   @Get()
@@ -49,17 +50,10 @@ export class ProductsController {
 
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
-  update(@Param('id') id: string, @Body() body: Partial<{
-    name: string;
-    category: ProductCategory;
-    priceCents: number;
-    unit: string;
-    active: boolean;
-    requiresPrep: boolean;
-    trackStock: boolean;
-    stockQty: number;
-  }>) {
-    return this.productsService.update(id, body);
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
+    const updateData: any = { ...dto };
+    if (dto.category) updateData.category = dto.category as ProductCategory;
+    return this.productsService.update(id, updateData);
   }
 
   @Patch(':id/active')
@@ -70,7 +64,7 @@ export class ProductsController {
 
   @Patch(':id/stock')
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
-  adjustStock(@Param('id') id: string, @Body() body: { qty: number; reason: string }, @Req() req: any) {
-    return this.productsService.adjustStock(id, body.qty, body.reason, req.user.userId);
+  adjustStock(@Param('id') id: string, @Body() dto: AdjustStockDto, @Req() req: any) {
+    return this.productsService.adjustStock(id, dto.qty, dto.reason, req.user.userId);
   }
 }

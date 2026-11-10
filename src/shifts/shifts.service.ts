@@ -25,7 +25,7 @@ export class ShiftsService {
 
   async open(data: {
     openedBy: Types.ObjectId;
-    initialCashCents: number;
+    initialCash: number; // já vem em centavos (pipe converte)
     productIds: Types.ObjectId[];
   }) {
     const openShift = await this.shiftModel.findOne({ status: ShiftStatus.ABERTO });
@@ -40,7 +40,7 @@ export class ShiftsService {
     const shift = new this.shiftModel({
       number,
       openedBy: data.openedBy,
-      initialCashCents: data.initialCashCents,
+      initialCashCents: data.initialCash,
       availability,
     });
     return shift.save();
@@ -85,19 +85,17 @@ export class ShiftsService {
   async close(data: {
     shiftId: string;
     closedBy: Types.ObjectId;
-    countedCashCents: number;
+    countedCash: number; // já vem em centavos
     closingNotes?: string;
   }) {
     const shift = await this.shiftModel.findById(data.shiftId);
     if (!shift) throw new NotFoundException('Turno não encontrado');
     if (shift.status !== ShiftStatus.ABERTO) throw new BadRequestException('Turno já está fechado');
 
-    // Calcular esperado
-    // Será calculado no service de fechamento com base nos pagamentos
     shift.status = ShiftStatus.FECHADO;
     shift.closedBy = data.closedBy;
     shift.closedAt = new Date();
-    shift.countedCashCents = data.countedCashCents;
+    shift.countedCashCents = data.countedCash;
     if (data.closingNotes) shift.closingNotes = data.closingNotes;
     
     return shift.save();

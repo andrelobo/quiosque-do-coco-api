@@ -19,7 +19,7 @@ export class RefundsService {
     paymentId: Types.ObjectId;
     orderId: Types.ObjectId;
     shiftId: Types.ObjectId;
-    amountCents: number;
+    amount: number; // já vem em centavos
     method: string;
     reason: string;
     createdBy: Types.ObjectId;
@@ -29,7 +29,7 @@ export class RefundsService {
     if (payment.status !== PaymentStatus.CONFIRMADO) {
       throw new BadRequestException('Só é possível devolver pagamentos confirmados');
     }
-    if (data.amountCents > payment.amountCents) {
+    if (data.amount > payment.amountCents) {
       throw new BadRequestException('Valor da devolução maior que o pagamento');
     }
 
@@ -44,7 +44,7 @@ export class RefundsService {
       payment: data.paymentId,
       order: data.orderId,
       shift: data.shiftId,
-      amountCents: data.amountCents,
+      amountCents: data.amount,
       status: 'pendente',
       method: data.method,
       reason: data.reason,
@@ -54,7 +54,7 @@ export class RefundsService {
     await refund.save();
     await this.logAudit('refund.created', 'Refund', refund._id, data.createdBy, {
       payment: data.paymentId,
-      amountCents: data.amountCents,
+      amountCents: data.amount,
     });
 
     return refund;

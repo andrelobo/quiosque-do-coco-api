@@ -5,6 +5,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/transform.interceptor';
+import { CurrencyTransformPipe } from './common/pipes/currency-transform.pipe';
+import { CurrencyResponseInterceptor } from './common/interceptors/currency-response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,8 +18,11 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }),
+    new CurrencyTransformPipe(),
+  );
+  app.useGlobalInterceptors(new TransformInterceptor(), new CurrencyResponseInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Quiosque do Coco API')

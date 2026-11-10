@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../users/user.schema';
+import { CreateRefundDto } from './refunds.dto';
 
 @ApiTags('Devoluções')
 @ApiBearerAuth()
@@ -17,21 +18,14 @@ export class RefundsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
   @ApiOperation({ summary: 'Criar devolução (pendente)' })
-  create(@Body() body: {
-    paymentId: string;
-    orderId: string;
-    shiftId: string;
-    amountCents: number;
-    method: string;
-    reason: string;
-  }, @Req() req: any) {
+  create(@Body() dto: CreateRefundDto, @Req() req: any) {
     return this.refundsService.create({
-      paymentId: new Types.ObjectId(body.paymentId),
-      orderId: new Types.ObjectId(body.orderId),
-      shiftId: new Types.ObjectId(body.shiftId),
-      amountCents: body.amountCents,
-      method: body.method,
-      reason: body.reason,
+      paymentId: new Types.ObjectId(dto.paymentId),
+      orderId: new Types.ObjectId(dto.orderId),
+      shiftId: new Types.ObjectId(dto.shiftId),
+      amount: dto.amount,
+      method: dto.method,
+      reason: dto.reason,
       createdBy: req.user.userId,
     });
   }

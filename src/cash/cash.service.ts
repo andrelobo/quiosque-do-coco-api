@@ -14,7 +14,7 @@ export class CashService {
   async create(data: {
     shiftId: Types.ObjectId;
     type: CashMovementType;
-    amountCents: number;
+    amount: number; // já vem em centavos
     reason: string;
     userId: Types.ObjectId;
   }) {
@@ -27,7 +27,7 @@ export class CashService {
     const movement = new this.cashMovementModel({
       shift: data.shiftId,
       type: data.type,
-      amountCents: data.amountCents,
+      amountCents: data.amount,
       reason: data.reason,
       user: data.userId,
     });

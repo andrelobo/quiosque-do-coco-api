@@ -22,8 +22,8 @@ export class PaymentsService {
     orderId: Types.ObjectId;
     shiftId: Types.ObjectId;
     method: PaymentMethod;
-    amountCents: number;
-    receivedCents?: number;
+    amount: number; // já vem em centavos
+    received?: number; // já vem em centavos
     cardType?: CardType;
     reference?: string;
     createdBy: Types.ObjectId;
@@ -34,19 +34,18 @@ export class PaymentsService {
       throw new BadRequestException('Pedido não está aguardando pagamento');
     }
 
-    // Verificar se já existe pagamento pendente/confirmado para este pedido
     const existing = await this.paymentModel.findOne({
       order: data.orderId,
       status: { $in: [PaymentStatus.PENDENTE, PaymentStatus.CONFIRMADO] },
     });
     if (existing) throw new ConflictException('Já existe pagamento pendente ou confirmado para este pedido');
 
-    let changeCents = 0;
+    let change = 0;
     if (data.method === PaymentMethod.DINHEIRO) {
-      if (!data.receivedCents || data.receivedCents < data.amountCents) {
+      if (!data.received || data.received < data.amount) {
         throw new BadRequestException('Valor recebido insuficiente');
       }
-      changeCents = data.receivedCents - data.amountCents;
+      change = data.received - data.amount;
     }
 
     const payment = new this.paymentModel({
@@ -54,9 +53,9 @@ export class PaymentsService {
       shift: data.shiftId,
       method: data.method,
       cardType: data.cardType,
-      amountCents: data.amountCents,
-      receivedCents: data.receivedCents || data.amountCents,
-      changeCents,
+      amountCents: data.amount,
+      receivedCents: data.received || data.amount,
+      changeCents: change,
       status: PaymentStatus.PENDENTE,
       reference: data.reference,
     });
@@ -65,7 +64,7 @@ export class PaymentsService {
     await this.logAudit('payment.created', 'Payment', payment._id, data.createdBy, {
       order: data.orderId,
       method: data.method,
-      amountCents: data.amountCents,
+      amountCents: data.amount,
     });
 
     return payment;
@@ -91,11 +90,9 @@ export class PaymentsService {
       method: payment.method,
     });
 
-    // Com o pagamento confirmado, libera o pedido (pago -> preparo/entrega).
     try {
       await this.ordersService.confirmPayment(String(payment.order), userId);
     } catch (error) {
-      // Pagamento parcial ou pedido em outro status: segue o fluxo normal.
       if (!(error instanceof BadRequestException)) throw error;
     }
 
