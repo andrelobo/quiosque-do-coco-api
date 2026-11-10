@@ -20,7 +20,8 @@ npm run start:dev       # http://localhost:4000
 ```
 
 O Mongo local pode ser iniciado pelo `docker-compose.yml` da raiz do workspace
-(`docker compose up -d mongodb`).
+(`docker compose up -d mongodb`). Em produção usamos **MongoDB Atlas** — a API
+não roda banco de dados na VPS.
 
 ### Variáveis de ambiente
 
