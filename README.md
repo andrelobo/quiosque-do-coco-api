@@ -65,13 +65,21 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-O container publica **apenas** `127.0.0.1:4000`; o HTTPS fica com o Caddy:
+O container publica **apenas** `127.0.0.1:4000` e entra na rede externa `edge`,
+compartilhada com o Caddy. O HTTPS fica com o Caddy:
 
 ```caddy
 quiosque-api.seudominio.com {
-    reverse_proxy 127.0.0.1:4000
+    reverse_proxy quiosque-api:4000
 }
 ```
+
+### Deploy automático
+
+Todo push na `main` dispara o workflow `.github/workflows/deploy.yml`, que acessa
+a VPS por SSH e executa `git pull` + rebuild do container da API. Segredos
+necessários no repositório: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` e
+`VPS_APP_DIR` (ex.: `/home/ubuntu/quiosque-api`).
 
 Como o frontend (Vercel) e a API (VPS) são sites diferentes, o cookie de sessão
 usa `SameSite=None; Secure` em produção. Por isso a API **precisa** ser servida
