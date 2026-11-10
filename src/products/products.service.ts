@@ -28,17 +28,17 @@ export class ProductsService {
 
   async findAll(includeInactive = false) {
     const filter = includeInactive ? {} : { active: true };
-    return this.productModel.find(filter).sort({ category: 1, name: 1 }).lean();
+    return this.productModel.find(filter).sort({ category: 1, name: 1 }).lean({ virtuals: true });
   }
 
   async findById(id: string) {
-    const product = await this.productModel.findById(id).lean();
+    const product = await this.productModel.findById(id).lean({ virtuals: true });
     if (!product) throw new NotFoundException('Produto não encontrado');
     return product;
   }
 
   async findByCategory(category: ProductCategory) {
-    return this.productModel.find({ category, active: true }).lean();
+    return this.productModel.find({ category, active: true }).lean({ virtuals: true });
   }
 
   async update(id: string, data: Partial<Product>) {
