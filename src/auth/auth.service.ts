@@ -1,7 +1,6 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
-import { UserRole } from '../users/user.schema';
 
 @Injectable()
 export class AuthService {
@@ -27,10 +26,6 @@ export class AuthService {
       },
       token,
     };
-  }
-
-  async register(data: { name: string; username: string; password: string; role?: UserRole }) {
-    return this.usersService.create(data);
   }
 
   async validateUser(userId: string) {

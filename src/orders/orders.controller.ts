@@ -112,9 +112,14 @@ export class OrdersController {
   }
 
   @Post(':id/cancel')
-  @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
-  @ApiOperation({ summary: 'Cancelar pedido' })
+  @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
+  @ApiOperation({ summary: 'Cancelar pedido (atendente só antes do pagamento)' })
   cancel(@Param('id') id: string, @Body() body: { reason: string }, @Req() req: any) {
-    return this.ordersService.cancel(id, new Types.ObjectId(req.user.userId), body.reason);
+    return this.ordersService.cancel(
+      id,
+      new Types.ObjectId(req.user.userId),
+      body.reason,
+      req.user.role,
+    );
   }
 }
