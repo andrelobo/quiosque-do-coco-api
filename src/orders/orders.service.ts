@@ -28,10 +28,16 @@ export class OrdersService {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
-  async getNextCode(shiftId: Types.ObjectId): Promise<number> {
+  // O código do pedido é único por dia (índice dayKey + code) e não por turno:
+  // se fosse por turno, o 2º turno do dia colidiria com o 1º.
+  async getNextCode(): Promise<number> {
     const dayKey = this.generateDayKey();
-    const count = await this.orderModel.countDocuments({ dayKey, shift: shiftId });
-    return count + 1;
+    const last = await this.orderModel
+      .findOne({ dayKey })
+      .sort({ code: -1 })
+      .select('code')
+      .lean();
+    return (last?.code ?? 0) + 1;
   }
 
   async create(data: {
@@ -82,21 +88,33 @@ export class OrdersService {
       totalCents += product.priceCents * item.qty;
     }
 
-    const code = await this.getNextCode(data.shiftId);
     const dayKey = this.generateDayKey();
+    let code = await this.getNextCode();
 
-    const order = new this.orderModel({
-      code,
-      dayKey,
-      shift: data.shiftId,
-      items: orderItems,
-      totalCents,
-      status: OrderStatus.EM_EDICAO,
-      pickupName: data.pickupName,
-      createdBy: data.createdBy,
-    });
-
-    await order.save();
+    // Duas comandas simultâneas podem calcular o mesmo código: tenta de novo.
+    let order!: OrderDocument;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      order = new this.orderModel({
+        code,
+        dayKey,
+        shift: data.shiftId,
+        items: orderItems,
+        totalCents,
+        status: OrderStatus.EM_EDICAO,
+        pickupName: data.pickupName,
+        createdBy: data.createdBy,
+      });
+      try {
+        await order.save();
+        break;
+      } catch (error) {
+        if ((error as any)?.code === 11000 && attempt < 4) {
+          code += 1;
+          continue;
+        }
+        throw error;
+      }
+    }
     await this.logAudit('order.created', 'Order', order._id, data.createdBy, { code, totalCents });
     return order.populate('items.product');
   }
