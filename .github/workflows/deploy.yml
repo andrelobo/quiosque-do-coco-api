@@ -24,7 +24,10 @@ jobs:
             set -e
             cd ${{ secrets.VPS_APP_DIR }}
             git pull --ff-only
+            # Sobe a stack inteira (mongo + api) para que um ambiente novo
+            # funcione no primeiro deploy; --wait falha o job se algum
+            # container não ficar healthy.
             docker compose build api
-            docker compose up -d --no-deps api
+            docker compose up -d --wait --wait-timeout 180
             docker image prune -f
             docker compose ps
