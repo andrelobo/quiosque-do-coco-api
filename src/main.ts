@@ -19,8 +19,8 @@ async function bootstrap() {
 
   app.use(cookieParser());
   app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }),
     new CurrencyTransformPipe(),
+    new ValidationPipe({ whitelist: true, transform: true, transformOptions: { enableImplicitConversion: true } }),
   );
   app.useGlobalInterceptors(new TransformInterceptor(), new CurrencyResponseInterceptor());
 
