@@ -2,8 +2,8 @@
 
 ## Work in progress
 - Branch: `main` synced with `origin/main`.
-- Payment/stock/CI fixes merged (PRs #4 and #5).
-- This round's changes (Nest 12 upgrade) live in `chore/upgrade-nest-12`, awaiting PR.
+- Nest 12 upgrade merged (PR #16, `b400d2b`) and deploy validated in production.
+- `script_stop` removed from the deploy workflow (PR #17, `e153735`); the following deploy ran without the ssh-action warning.
 
 ## Builds and validation
 - `npm run build` (`nest build`) ✅

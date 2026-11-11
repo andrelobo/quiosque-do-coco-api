@@ -50,7 +50,8 @@ API NestJS para o sistema Quiosque do Coco, composta por:
   - `products.service.spec.ts`: ajuste válido, qty inválida, motivo vazio, produto inexistente, produto sem controle de estoque e bloqueio de saldo negativo;
   - `orders.service.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, pedido cancelado e ausência de pagamento.
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` corrige e `npm run lint:check` só valida (0 problemas).
-- **CI**: `.github/workflows/ci.yml` roda `npm ci`, `lint:check`, `test` e `build` em PRs e no `main`. O deploy da API agora só dispara após o CI concluir com sucesso (`workflow_run`).
+- **CI**: `.github/workflows/ci.yml` roda `npm ci`, `lint:check`, `test` e `build` em PRs e no `main` (Node 22). O deploy da API agora só dispara após o CI concluir com sucesso (`workflow_run`).
+- **Deploy**: `.github/workflows/deploy.yml` usa `appleboy/ssh-action` sem `script_stop` (entrada removida na 1.2.5); o script remoto já roda com `set -e`.
 - **Dependabot**: atualizações semanais de npm (grupos `@nestjs/*` e dev tooling) e mensais de GitHub Actions.
 
 ## Upgrade Nest 12 (11/11/2026)
