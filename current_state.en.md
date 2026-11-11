@@ -1,19 +1,22 @@
 # Quiosque do Coco - API (Server) - Current State (2026-11-11)
 
 ## Work in progress
-- Branch: `main` synced with `origin/main` (`a3fb4a7`).
-- PRs #3 (web) and #4 (API) merged; remote fix branches removed.
-- This round's changes are **not committed yet** (stock adjustment, audit, tests, lint and CI).
+- Branch: `main` synced with `origin/main`.
+- Payment/stock/CI fixes merged (PRs #4 and #5).
+- This round's changes (Nest 12 upgrade) live in `chore/upgrade-nest-12`, awaiting PR.
 
 ## Builds and validation
-- `npx tsc --noEmit -p tsconfig.json` ✅ (no errors)
-- `npm run build` (`nest build`) ✅ (no errors)
+- `npm run build` (`nest build`) ✅
 - `npm run lint:check` ✅ (0 errors, 0 warnings)
-- `npm test` ✅ (`2` suites, `13` tests)
-- `cd web && npm run build` (`vite build`) ✅ (no errors)
-- `npm run smoke` (regression script) ✅ against disposable database `quiosque_smoke`
-- `npm run smoke` ✅ also against the local database (`quiosque`, reusing shift #12)
-- No test residue: smoke orders/payments/movements/logs removed; stock restored (`Croissant` 4/0).
+- `npm test` ✅ Vitest (`2` suites, `13` tests)
+- `npm run smoke` ✅ against a disposable database
+- `docker build` + Node 22 container ✅ (`/api/docs` 200)
+- `npm audit`: 7 dev-only moderate, 0 high
+
+## Nest 12 upgrade (2026-11-11)
+- Nest `common/core/platform-express` 12.4, `config` 12.1, `swagger` 12.1, `jwt` 12.0, `mongoose` 12.0, `passport` 12.0, `cli/schematics/testing` 12; TypeScript 6; Node 22 (CI and Dockerfile).
+- Nest 12 is ESM-only; the build stays CommonJS and the runtime uses Node's native `require(ESM)` (`>=22.12`).
+- Jest/ts-jest → Vitest 5 + `unplugin-swc` (decorator metadata); `jest.config.js` removed.
 
 ## Merged fixes (PR #4)
 

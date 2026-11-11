@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ProductsService } from './products.service';
@@ -20,11 +21,11 @@ describe('ProductsService.adjustStock', () => {
 
   beforeEach(() => {
     productModel = {
-      findById: jest.fn(),
-      findOneAndUpdate: jest.fn(),
+      findById: vi.fn(),
+      findOneAndUpdate: vi.fn(),
     };
-    stockMovementModel = { create: jest.fn().mockResolvedValue({}) };
-    auditService = { log: jest.fn().mockResolvedValue({}) };
+    stockMovementModel = { create: vi.fn().mockResolvedValue({}) };
+    auditService = { log: vi.fn().mockResolvedValue({}) };
     service = new ProductsService(productModel, stockMovementModel, auditService);
   });
 

@@ -4,6 +4,7 @@ node_modules/
 # Build
 dist/
 coverage/
+*.tsbuildinfo
 
 # Ambiente e segredos
 # Somente .env.example é versionado. Todos os demais .env* ficam fora do repo.
