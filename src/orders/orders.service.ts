@@ -121,7 +121,11 @@ export class OrdersService {
   }
 
   async findById(id: string) {
-    const order = await this.orderModel.findById(id).populate('items.product').lean();
+    const order = await this.orderModel
+      .findById(id)
+      .populate('items.product')
+      .populate('shift', 'number')
+      .lean();
     if (!order) throw new NotFoundException('Pedido não encontrado');
     return order;
   }
@@ -129,7 +133,12 @@ export class OrdersService {
   async findByShift(shiftId: Types.ObjectId, status?: OrderStatus) {
     const filter: any = { shift: shiftId };
     if (status) filter.status = status;
-    return this.orderModel.find(filter).populate('items.product').sort({ createdAt: -1 }).lean();
+    return this.orderModel
+      .find(filter)
+      .populate('items.product')
+      .populate('shift', 'number')
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   async findAll(status?: OrderStatus, page = 1, limit = 10, search?: string) {
@@ -144,14 +153,25 @@ export class OrdersService {
     }
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      this.orderModel.find(filter).populate('items.product').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.orderModel
+        .find(filter)
+        .populate('items.product')
+        .populate('shift', 'number')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       this.orderModel.countDocuments(filter),
     ]);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findByCode(dayKey: string, code: number) {
-    return this.orderModel.findOne({ dayKey, code }).populate('items.product').lean();
+    return this.orderModel
+      .findOne({ dayKey, code })
+      .populate('items.product')
+      .populate('shift', 'number')
+      .lean();
   }
 
   async updateItems(orderId: string, items: Array<{ productId: string; qty: number; note?: string }>, userId: Types.ObjectId) {
