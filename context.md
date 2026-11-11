@@ -50,7 +50,7 @@ API NestJS para o sistema Quiosque do Coco, composta por:
   - `products.service.spec.ts`: ajuste válido, qty inválida, motivo vazio, produto inexistente, produto sem controle de estoque e bloqueio de saldo negativo;
   - `orders.service.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, pedido cancelado e ausência de pagamento.
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` corrige e `npm run lint:check` só valida (0 problemas).
-- **CI**: `.github/workflows/ci.yml` roda `npm ci`, `lint:check`, `test` e `build` em PRs e no `main` (Node 22). O deploy da API agora só dispara após o CI concluir com sucesso (`workflow_run`).
+- **CI**: `.github/workflows/ci.yml` roda `npm ci`, `lint:check`, `test` e `build` em PRs e no `main` (Node 22) em `lint-test-build`; o job `smoke` sobe a API com Mongo 7 como service container em banco descartável (`quiosque_e2e`) e roda `npm run smoke`. O deploy da API agora só dispara após o CI concluir com sucesso (`workflow_run`).
 - **Deploy**: `.github/workflows/deploy.yml` usa `appleboy/ssh-action` sem `script_stop` (entrada removida na 1.2.5); o script remoto já roda com `set -e`.
 - **Dependabot**: atualizações semanais de npm (grupos `@nestjs/*` e dev tooling) e mensais de GitHub Actions.
 
@@ -64,5 +64,5 @@ API NestJS para o sistema Quiosque do Coco, composta por:
 
 ## P1 Pendentes (restantes)
 - `npm audit`: 7 vulnerabilidades moderate dev-only (`typescript-eslint` → `minimatch`); não há correção publicada ainda. Sem vulnerabilidades high. Reavaliar quando o `typescript-eslint` atualizar.
-- Testes e2e com banco real (o smoke cobre o fluxo, mas não roda no CI por depender de Mongo).
+- Testes e2e: cobertos pelo job `smoke` no CI (Mongo 7 como service container, banco `quiosque_e2e` descartável).
 - `.env.production` já removido do versionamento/histórico; manter conferência no deploy da VPS.

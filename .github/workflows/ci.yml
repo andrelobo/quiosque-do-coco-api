@@ -34,3 +34,64 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Regressão end-to-end do fluxo de venda contra um Mongo real e descartável.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 1)'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/quiosque_e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Subir a API
+        env:
+          NODE_ENV: test
+          PORT: 4000
+          # Cria admin/admin123 e os produtos de exemplo no banco descartável.
+          SEED_ON_BOOT: 'true'
+          JWT_SECRET: ci-smoke-secret
+          FRONTEND_URL: http://localhost:5173
+        run: |
+          node dist/main.js > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:4000/api/docs > /dev/null; then
+              echo "API pronta após ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API não subiu a tempo"
+          cat /tmp/api.log
+          exit 1
+
+      - name: Smoke (fluxo de venda)
+        run: npm run smoke
+
+      - name: Log da API em caso de falha
+        if: failure()
+        run: tail -100 /tmp/api.log || true
