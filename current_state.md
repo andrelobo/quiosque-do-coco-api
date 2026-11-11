@@ -1,19 +1,21 @@
 # Quiosque do Coco - API (Server) - Estado Atual (11/11/2026)
 
 ## Branch em andamento
-- Branch: `fix/confirm-payment-e-hardening` (a partir de `main`)
-- Alterações ainda não commitadas/pushadas nesta sessão.
-- Pacote de P0 + P1 concluído e validado com script de regressão.
+- Branch: `main` sincronizada com `origin/main` (`a3fb4a7`).
+- PRs #3 (web) e #4 (API) mergeados; branches remotas de correção removidas.
+- Alterações desta rodada ainda **não commitadas** (ajuste de estoque, auditoria, testes, lint e CI).
 
 ## Builds e validações
 - `npx tsc --noEmit -p tsconfig.json` ✅ (sem erros)
 - `npm run build` (`nest build`) ✅ (sem erros)
+- `npm run lint:check` ✅ (0 erros, 0 warnings)
+- `npm test` ✅ (`2` suítes, `13` testes)
 - `cd web && npm run build` (`vite build`) ✅ (sem erros)
-- `npm run smoke` (script de regressão) ✅ contra banco descartável `quiosque_smoke`
+- `npm run smoke` ✅ contra banco descartável `quiosque_smoke`
 - `npm run smoke` ✅ também contra o banco local (`quiosque`, turno #12 reutilizado)
 - Nenhum resíduo de teste: pedidos/pagamentos/movimentos/logs do smoke removidos; estoque restaurado (`Croissant` 4/0).
 
-## Correções desta sessão
+## Correções já mergeadas (PR #4)
 
 ### P0 — confirmação de pagamento
 - `OrdersService.confirmPayment` é fonte única e idempotente:
@@ -45,11 +47,42 @@
 ### P1 — populate do turno
 - `ShiftAvailability` passou a ter schema próprio (`ShiftAvailabilitySchema`); antes o Mongoose registrava `availability` como `Mixed` e o `ref` de `product` era ignorado.
 - `GET /shifts/current` e `GET /shifts/:id/products` agora retornam o produto completo.
+- Front aceita `availability.product` como id ou objeto durante o deploy.
 
 ### P1 — auditoria
 - `GET /audit/logs` (filtros `action`, `entity`, `userId`, `start`, `end`).
 - `GET /audit/entity/:entity/:entityId`.
 - Restritos a `admin` e `responsavel`; validam ObjectId/datas.
+- `AuditService.log` preenche `userName` a partir do `userId`.
+
+## Entregas desta rodada (não commitadas)
+
+### Ajuste de estoque com movimentação e auditoria
+- `PATCH /products/:id/stock` (`ProductsService.adjustStock`):
+  - `qty` inteiro e diferente de zero (`AdjustStockDto` com `IsInt`/`NotEquals(0)`);
+  - `reason` obrigatório e sem espaços em branco;
+  - 404 para produto inexistente; 409 para produto com `trackStock=false`;
+  - atualização atômica com `$expr: { $gte: [{ $add: ['$stockQty', qty] }, 0] }`, sem lost update;
+  - 409 quando o ajuste deixaria o saldo negativo, sem gravar movimento/auditoria;
+  - grava `StockMovement` tipo `ajuste` (`qty` com sinal, `balanceAfter`, `reason`, `user`);
+  - grava auditoria `product.stock.adjusted` com `previousQty`/`balanceAfter` em `meta`.
+- `ProductsModule` registra `StockMovement` e importa `AuditModule`.
+- Validado via API: `+5` ok; `-999` 409; `qty=0` 400; motivo vazio 400; sem `trackStock` 409; movimento e auditoria gravados.
+
+### Testes automatizados
+- Jest + ts-jest (`jest.config.js`), sem dependência de banco.
+- Scripts: `npm test`, `npm run test:watch`, `npm run test:cov`.
+- `src/products/products.service.spec.ts`: ajuste válido, qty inválida, motivo vazio, produto inexistente, sem controle de estoque e bloqueio de saldo negativo.
+- `src/orders/orders.service.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, cancelado e sem pagamento.
+- Resultado: `2` suítes, `13` testes passando.
+
+### Lint e CI
+- ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint.
+- `npm run lint` (com `--fix`) e `npm run lint:check` (somente validação).
+- Imports não usados removidos em controllers/DTOs/serviços.
+- `.github/workflows/ci.yml`: `npm ci` + `lint:check` + `test` + `build` em PRs e no `main`.
+- `.github/workflows/deploy.yml`: deploy da VPS agora só roda após o CI concluir com sucesso (`workflow_run`), mantendo `workflow_dispatch`.
+- `.github/dependabot.yml`: npm semanal (grupos `@nestjs/*` e dev tooling) e GitHub Actions mensal.
 
 ## Status dos Endpoints (API: http://localhost:4000)
 
@@ -77,6 +110,11 @@
 - `POST /shifts/:id/close` ✅ persiste `expectedCashCents`/`differenceCents`
 - `GET /shifts/:id/products` ✅ retorna os produtos completos do turno
 
+### Produtos e estoque
+- `PATCH /products/:id/stock` ✅ ajuste atômico + `StockMovement` + auditoria
+- `GET /stock/product/:id` ✅ lista movimentos com usuário
+- `GET /reports/stock` ✅ resumo por tipo e saldo por produto
+
 ### Auditoria
 - `GET /audit/logs` ✅ admin/responsável
 - `GET /audit/entity/:entity/:entityId` ✅ admin/responsável
@@ -90,11 +128,11 @@
 
 ## Dados locais
 - Banco `quiosque`: turno #12 aberto, 184 pedidos, 184 pagamentos (nenhum resíduo de smoke).
+- Banco descartável `quiosque_smoke`: dropado após a validação.
 - Resíduo antigo opcional: pedido cancelado `6af461c2f6fa028bdd50c2e1` (pickup "Teste Regressao") + pagamento/logs.
 
 ## Próximos Passos
-- Commitar na branch e abrir PR (sem push automático).
-- (Feito) `populate('availability.product')` corrigido com schema próprio do subdocumento; o front aceita id ou objeto durante o deploy.
-- Adicionar `StockMovement`/audit no `adjustStock`.
-- Introduzir framework de testes (Jest/Supertest) reaproveitando o roteiro do smoke.
-- Resolver `npm audit` e incluir lint no CI.
+- Commitar as alterações desta rodada e abrir PR (sem push automático).
+- Upgrade major do Nest (`@nestjs/cli@12`, `@nestjs/*@12`, `@nestjs/config@12`) em branch dedicada para zerar o `npm audit`; validar com `test`, `build` e `smoke`.
+- Avaliar testes e2e com Mongo em serviço no CI (hoje o CI cobre apenas unitários).
+- Manter Dependabot ativo e revisar PRs agrupados semanalmente.

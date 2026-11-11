@@ -16,7 +16,18 @@ export class AuditService {
     justification?: string;
     meta?: Record<string, any>;
   }) {
-    return this.auditLogModel.create(data);
+    // Preenche o nome do usuário quando só o id foi informado, para o log ficar
+    // legível sem depender dos .populate() de cada serviço.
+    let userName = data.userName;
+    if (!userName && data.userId) {
+      const user = await this.auditLogModel.db
+        .model('User')
+        .findById(data.userId)
+        .select('name')
+        .lean();
+      userName = (user as any)?.name;
+    }
+    return this.auditLogModel.create({ ...data, userName });
   }
 
   async findByEntity(entity: string, entityId: Types.ObjectId) {

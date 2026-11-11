@@ -38,19 +38,35 @@ NestJS API for the Quiosque do Coco system, composed of:
 - **Regression**: `server/scripts/smoke-sale-flow.mjs` (`npm run smoke`) covers login, shift, create/edit, submit, payment rejections, cash with change, Pix, idempotency, stock reserve/release, cash summary, audit and persisted shift close.
 - **Status rule**: products without `requiresPrep` go to `PRONTO` after payment; with prep go to `PAGO`. Stock is still only decreased on explicit delivery.
 
+## Post-merge deliveries (2026-11-11)
+- **Stock adjustment**: `PATCH /products/:id/stock` (`ProductsService.adjustStock`) now:
+  - requires integer non-zero `qty` and non-empty `reason`;
+  - rejects unknown products and products with `trackStock=false`;
+  - updates atomically with `$expr` (`stockQty + qty >= 0`), preventing negative balances and lost updates;
+  - writes a `StockMovement` of type `ajuste` with `balanceAfter`, reason and user;
+  - writes an audit entry `product.stock.adjusted` with `previousQty`/`balanceAfter` in `meta`.
+- **Audit**: `AuditService.log` resolves `userName` from `userId` when the name is not provided.
+- **Automated tests**: Jest + ts-jest (no database), 13 tests across 2 suites:
+  - `products.service.spec.ts`: valid adjustment, invalid qty, empty reason, unknown product, product without stock tracking and negative-balance guard;
+  - `orders.service.spec.ts`: confirmation with/without prep, idempotency, order not awaiting payment, cancelled order and missing payment.
+- **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` fixes and `npm run lint:check` only validates (0 problems).
+- **CI**: `.github/workflows/ci.yml` runs `npm ci`, `lint:check`, `test` and `build` on PRs and `main`. API deploy now only runs after CI succeeds (`workflow_run`).
+- **Dependabot**: weekly npm updates (groups `@nestjs/*` and dev tooling) and monthly GitHub Actions updates.
+
 ## P1 Pending (remaining)
-- Automated test framework (unit/e2e) — only the smoke script exists today.
-- `adjustStock` without `StockMovement`/audit.
-- `.env.production` tracked with a dev JWT secret (history cleaned; check deploy).
-- `npm audit` vulnerabilities and no lint in CI.
+- `npm audit`: 28 vulnerabilities (5 low, 12 moderate, 11 high). Fixes require major upgrades (`@nestjs/cli@12`, `@nestjs/*@12`, `@nestjs/config@12`); `npm audit fix --force` was not applied because it is breaking. Plan: dedicated Nest 11/12 upgrade branch validated with smoke + tests before merge.
+- Real-database e2e tests (smoke covers the flow but does not run in CI because it needs Mongo).
+- `.env.production` is already removed from versioning/history; keep verifying the VPS deploy.
 
 ## Repository Git (server)
 - Branch: `main` (protected)
-- Last commit: `5b37dee chore: versiona apenas .env.example (remove .env.production)`
+- Last commit: `a3fb4a7 Merge pull request #4 from andrelobo/fix/confirm-payment-e-hardening`
 - Merged PRs:
   - #1: `fix: serialization, delivery without payment and seed in production` (e33e192 → 5b37dee)
   - #2: `chore: versiona apenas .env.example (remove .env.production)` (bd3430b)
   - #3: `feat: add search parameter to order listing` (d20dd3e)
+  - #4: `fix: confirm payment and harden sale flow` (25be25d, aea09ce)
+- Remote branches from merged PRs removed; local `main` synced with `origin/main`.
 - `.env.production` removed from history via `git-filter-repo` + force push
 - Only `.env.example` is versioned
 - `.gitignore` ignores `.env` and `.env.*`, releases only `.env.example`

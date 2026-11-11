@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Product, ProductDocument, ProductCategory } from './product.schema';
+import { StockMovement, StockMovementDocument, StockMovementType } from '../stock/stock.schema';
+import { AuditService } from '../common/audit/audit.service';
 
 interface ProductWithVirtual extends ProductDocument {
   availableQty: number;
@@ -9,7 +11,11 @@ interface ProductWithVirtual extends ProductDocument {
 
 @Injectable()
 export class ProductsService {
-  constructor(@InjectModel(Product.name) private productModel: Model<ProductDocument>) {}
+  constructor(
+    @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    @InjectModel(StockMovement.name) private stockMovementModel: Model<StockMovementDocument>,
+    private readonly auditService: AuditService,
+  ) {}
 
   async create(data: {
     name: string;
@@ -85,15 +91,61 @@ export class ProductsService {
   }
 
   async adjustStock(id: string, qty: number, reason: string, userId: Types.ObjectId) {
+    if (!Number.isInteger(qty) || qty === 0) {
+      throw new BadRequestException('Quantidade do ajuste deve ser um número inteiro diferente de zero');
+    }
+    const trimmedReason = reason?.trim();
+    if (!trimmedReason) throw new BadRequestException('Motivo do ajuste é obrigatório');
+
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Produto não encontrado');
     if (!product.trackStock) throw new ConflictException('Produto não controla estoque');
-    
-    const newQty = Math.max(0, product.stockQty + qty);
-    product.stockQty = newQty;
-    await product.save();
-    
-    return product;
+
+    const previousQty = product.stockQty;
+
+    // Atualização condicional: só grava se o saldo resultante continuar >= 0.
+    // Evita lost update se outro ajuste/entrega mexer no estoque ao mesmo tempo.
+    const updated = await this.productModel.findOneAndUpdate(
+      {
+        _id: id,
+        trackStock: true,
+        $expr: { $gte: [{ $add: ['$stockQty', qty] }, 0] },
+      },
+      { $inc: { stockQty: qty } },
+      { new: true },
+    );
+    if (!updated) {
+      const current = await this.productModel.findById(id).lean();
+      throw new ConflictException(
+        `Ajuste deixaria o estoque negativo (saldo atual: ${current?.stockQty ?? previousQty})`,
+      );
+    }
+
+    await this.stockMovementModel.create({
+      product: updated._id,
+      type: StockMovementType.AJUSTE,
+      qty,
+      balanceAfter: updated.stockQty,
+      reason: trimmedReason,
+      user: userId,
+    });
+
+    await this.auditService.log({
+      action: 'product.stock.adjusted',
+      entity: 'Product',
+      entityId: updated._id,
+      userId,
+      justification: trimmedReason,
+      meta: {
+        productName: updated.name,
+        qty,
+        previousQty,
+        balanceAfter: updated.stockQty,
+        reason: trimmedReason,
+      },
+    });
+
+    return updated;
   }
 
   async reserveStock(id: string, qty: number) {

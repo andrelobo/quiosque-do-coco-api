@@ -38,8 +38,22 @@ API NestJS para o sistema Quiosque do Coco, composta por:
 - **Regressão**: `server/scripts/smoke-sale-flow.mjs` (`npm run smoke`) cobre login, turno, criar/editar, submit, rejeições de pagamento, dinheiro com troco, Pix, idempotência, reserva/liberação de estoque, resumo de caixa, auditoria e fechamento persistido.
 - **Regra de status**: produto sem `requiresPrep` vai para `PRONTO` ao pagar; com preparo vai para `PAGO`. O estoque continua baixando apenas na entrega explícita.
 
+## Entregas pós-merge (11/11/2026)
+- **Ajuste de estoque**: `PATCH /products/:id/stock` (`ProductsService.adjustStock`) agora:
+  - exige `qty` inteiro diferente de zero e `reason` não vazio;
+  - rejeita produto inexistente e produto com `trackStock=false`;
+  - atualiza de forma atômica com `$expr` (`stockQty + qty >= 0`), impedindo saldo negativo e lost update;
+  - grava `StockMovement` do tipo `ajuste` com `balanceAfter`, motivo e usuário;
+  - grava auditoria `product.stock.adjusted` com `previousQty`/`balanceAfter` no `meta`.
+- **Auditoria**: `AuditService.log` resolve `userName` a partir do `userId` quando o nome não é informado.
+- **Testes automatizados**: Jest + ts-jest (sem banco), com 13 testes em 2 suítes:
+  - `products.service.spec.ts`: ajuste válido, qty inválida, motivo vazio, produto inexistente, produto sem controle de estoque e bloqueio de saldo negativo;
+  - `orders.service.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, pedido cancelado e ausência de pagamento.
+- **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` corrige e `npm run lint:check` só valida (0 problemas).
+- **CI**: `.github/workflows/ci.yml` roda `npm ci`, `lint:check`, `test` e `build` em PRs e no `main`. O deploy da API agora só dispara após o CI concluir com sucesso (`workflow_run`).
+- **Dependabot**: atualizações semanais de npm (grupos `@nestjs/*` e dev tooling) e mensais de GitHub Actions.
+
 ## P1 Pendentes (restantes)
-- Framework de testes automatizados (unit/e2e) — hoje só há o script de smoke.
-- `adjustStock` sem `StockMovement`/audit.
-- `.env.production` versionado com JWT secret de dev (histórico já limpo; conferir deploy).
-- `npm audit` com vulnerabilidades e ausência de lint no CI.
+- `npm audit`: 28 vulnerabilidades (5 low, 12 moderate, 11 high). As correções exigem upgrade major (`@nestjs/cli@12`, `@nestjs/*@12`, `@nestjs/config@12`); `npm audit fix --force` não foi aplicado por ser breaking. Plano: branch dedicada de upgrade do Nest 11/12 com smoke + testes antes do merge.
+- Testes e2e com banco real (o smoke cobre o fluxo, mas não roda no CI por depender de Mongo).
+- `.env.production` já removido do versionamento/histórico; manter conferência no deploy da VPS.

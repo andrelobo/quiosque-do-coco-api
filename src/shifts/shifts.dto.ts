@@ -1,6 +1,5 @@
-import { IsNumber, IsOptional, IsArray, IsString, Min, ValidateNested } from 'class-validator';
+import { IsNumber, IsOptional, IsArray, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import { CurrencyField } from '../common/pipes/currency-transform.pipe';
 
 export class OpenShiftDto {

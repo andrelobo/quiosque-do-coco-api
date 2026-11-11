@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min, IsInt, NotEquals, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CurrencyField } from '../common/pipes/currency-transform.pipe';
 
@@ -80,11 +80,13 @@ export class UpdateProductDto {
 }
 
 export class AdjustStockDto {
-  @ApiProperty({ example: 10, description: 'Quantidade (positivo = entrada, negativo = saída/perda)' })
-  @IsNumber()
+  @ApiProperty({ example: 10, description: 'Quantidade inteira (positivo = entrada, negativo = saída/perda)' })
+  @IsInt()
+  @NotEquals(0)
   qty: number;
 
   @ApiProperty({ example: 'Reposição de estoque' })
   @IsString()
+  @IsNotEmpty()
   reason: string;
 }

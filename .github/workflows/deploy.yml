@@ -1,7 +1,10 @@
 name: Deploy API
 
 on:
-  push:
+  # Só faz deploy depois que o CI (lint, testes e build) passa no main.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -11,6 +14,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Deploy na VPS
