@@ -42,6 +42,10 @@
 - `ReportsService.cashSummary` retorna `pixCents`, `cardCents`, `cardDebitCents`, `cardCreditCents` e `totalSalesCents`.
 - `ShiftsModule` importa `ReportsModule`; `ReportsModule` exporta `ReportsService`.
 
+### P1 — populate do turno
+- `ShiftAvailability` passou a ter schema próprio (`ShiftAvailabilitySchema`); antes o Mongoose registrava `availability` como `Mixed` e o `ref` de `product` era ignorado.
+- `GET /shifts/current` e `GET /shifts/:id/products` agora retornam o produto completo.
+
 ### P1 — auditoria
 - `GET /audit/logs` (filtros `action`, `entity`, `userId`, `start`, `end`).
 - `GET /audit/entity/:entity/:entityId`.
@@ -69,9 +73,9 @@
 - `GET /reports/cash/:shiftId` ✅ dinheiro/Pix/cartão/esperado/diferença
 
 ### Turnos
-- `GET /shifts/current` ✅ turno aberto (⚠️ `availability.product` retorna id, sem populate)
+- `GET /shifts/current` ✅ turno aberto com `availability.product` populado (nome/preço/estoque)
 - `POST /shifts/:id/close` ✅ persiste `expectedCashCents`/`differenceCents`
-- `GET /shifts/:id/products` ⚠️ retorna apenas ids (populate não funciona)
+- `GET /shifts/:id/products` ✅ retorna os produtos completos do turno
 
 ### Auditoria
 - `GET /audit/logs` ✅ admin/responsável
@@ -90,7 +94,7 @@
 
 ## Próximos Passos
 - Commitar na branch e abrir PR (sem push automático).
-- Corrigir `populate('availability.product')` para o front receber nome/preço dos produtos do turno.
+- (Feito) `populate('availability.product')` corrigido com schema próprio do subdocumento; o front aceita id ou objeto durante o deploy.
 - Adicionar `StockMovement`/audit no `adjustStock`.
 - Introduzir framework de testes (Jest/Supertest) reaproveitando o roteiro do smoke.
 - Resolver `npm audit` e incluir lint no CI.

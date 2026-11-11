@@ -8,6 +8,10 @@ export enum ShiftStatus {
   FECHADO = 'fechado',
 }
 
+// Precisa ser um schema próprio: se a classe for usada direto em @Prop, o
+// Mongoose trata o subdocumento como Mixed e perde o ref de `product` (o
+// populate passa a não fazer nada).
+@Schema({ _id: false })
 export class ShiftAvailability {
   @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
   product: Types.ObjectId;
@@ -15,6 +19,8 @@ export class ShiftAvailability {
   @Prop({ default: true })
   available: boolean;
 }
+
+export const ShiftAvailabilitySchema = SchemaFactory.createForClass(ShiftAvailability);
 
 @Schema({ timestamps: true })
 export class Shift {
@@ -51,7 +57,7 @@ export class Shift {
   @Prop()
   closingNotes: string;
 
-  @Prop({ type: [ShiftAvailability], default: [] })
+  @Prop({ type: [ShiftAvailabilitySchema], default: [] })
   availability: ShiftAvailability[];
 }
 

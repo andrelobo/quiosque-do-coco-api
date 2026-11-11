@@ -34,12 +34,12 @@ API NestJS para o sistema Quiosque do Coco, composta por:
 - **Fechamento de turno**: `close()` persiste `expectedCashCents` e `differenceCents` no próprio turno, usando `ReportsService.cashSummary()`.
 - **Resumo de caixa**: `cashSummary` passou a retornar `pixCents`, `cardCents`, `cardDebitCents`, `cardCreditCents` e `totalSalesCents`.
 - **Auditoria**: novos `GET /audit/logs` e `GET /audit/entity/:entity/:entityId`, restritos a admin/responsável.
+- **Subdocumento do turno**: `ShiftAvailability` ganhou schema próprio (`shift.schema.ts`); antes o Mongoose tratava `availability` como `Mixed` e o `ref` de `product` se perdia, então `populate('availability.product')` não populava nada.
 - **Regressão**: `server/scripts/smoke-sale-flow.mjs` (`npm run smoke`) cobre login, turno, criar/editar, submit, rejeições de pagamento, dinheiro com troco, Pix, idempotência, reserva/liberação de estoque, resumo de caixa, auditoria e fechamento persistido.
 - **Regra de status**: produto sem `requiresPrep` vai para `PRONTO` ao pagar; com preparo vai para `PAGO`. O estoque continua baixando apenas na entrega explícita.
 
 ## P1 Pendentes (restantes)
 - Framework de testes automatizados (unit/e2e) — hoje só há o script de smoke.
-- `populate('availability.product')` não popula em `GET /shifts/current`/`GET /shifts/:id/products` (retornam só ids).
 - `adjustStock` sem `StockMovement`/audit.
 - `.env.production` versionado com JWT secret de dev (histórico já limpo; conferir deploy).
 - `npm audit` com vulnerabilidades e ausência de lint no CI.

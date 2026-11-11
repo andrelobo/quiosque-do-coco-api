@@ -34,12 +34,12 @@ NestJS API for the Quiosque do Coco system, composed of:
 - **Shift close**: `close()` persists `expectedCashCents` and `differenceCents` on the shift, using `ReportsService.cashSummary()`.
 - **Cash summary**: `cashSummary` now returns `pixCents`, `cardCents`, `cardDebitCents`, `cardCreditCents` and `totalSalesCents`.
 - **Audit**: new `GET /audit/logs` and `GET /audit/entity/:entity/:entityId`, restricted to admin/responsible.
+- **Shift subdocument**: `ShiftAvailability` now has its own schema (`shift.schema.ts`); previously Mongoose treated `availability` as `Mixed`, losing the `product` ref, so `populate('availability.product')` populated nothing.
 - **Regression**: `server/scripts/smoke-sale-flow.mjs` (`npm run smoke`) covers login, shift, create/edit, submit, payment rejections, cash with change, Pix, idempotency, stock reserve/release, cash summary, audit and persisted shift close.
 - **Status rule**: products without `requiresPrep` go to `PRONTO` after payment; with prep go to `PAGO`. Stock is still only decreased on explicit delivery.
 
 ## P1 Pending (remaining)
 - Automated test framework (unit/e2e) — only the smoke script exists today.
-- `populate('availability.product')` does not populate in `GET /shifts/current`/`GET /shifts/:id/products` (returns ids only).
 - `adjustStock` without `StockMovement`/audit.
 - `.env.production` tracked with a dev JWT secret (history cleaned; check deploy).
 - `npm audit` vulnerabilities and no lint in CI.

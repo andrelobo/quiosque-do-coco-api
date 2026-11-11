@@ -42,6 +42,10 @@
 - `ReportsService.cashSummary` returns `pixCents`, `cardCents`, `cardDebitCents`, `cardCreditCents` and `totalSalesCents`.
 - `ShiftsModule` imports `ReportsModule`; `ReportsModule` exports `ReportsService`.
 
+### P1 — shift populate
+- `ShiftAvailability` now has its own schema (`ShiftAvailabilitySchema`); previously Mongoose registered `availability` as `Mixed`, ignoring the `product` ref.
+- `GET /shifts/current` and `GET /shifts/:id/products` now return the full product.
+
 ### P1 — audit
 - `GET /audit/logs` (filters `action`, `entity`, `userId`, `start`, `end`).
 - `GET /audit/entity/:entity/:entityId`.
@@ -69,9 +73,9 @@
 - `GET /reports/cash/:shiftId` ✅ cash/Pix/card/expected/difference
 
 ### Shifts
-- `GET /shifts/current` ✅ open shift (⚠️ `availability.product` returns an id, not populated)
+- `GET /shifts/current` ✅ open shift with populated `availability.product` (name/price/stock)
 - `POST /shifts/:id/close` ✅ persists `expectedCashCents`/`differenceCents`
-- `GET /shifts/:id/products` ⚠️ returns ids only (populate does not work)
+- `GET /shifts/:id/products` ✅ returns the full shift products
 
 ### Audit
 - `GET /audit/logs` ✅ admin/responsible
@@ -90,7 +94,7 @@
 
 ## Next steps
 - Commit on the branch and open a PR (no automatic push).
-- Fix `populate('availability.product')` so the frontend receives shift product name/price.
+- (Done) `populate('availability.product')` fixed with a dedicated subdocument schema; the frontend accepts id or object during deploy.
 - Add `StockMovement`/audit to `adjustStock`.
 - Introduce a test framework (Jest/Supertest) reusing the smoke script flow.
 - Resolve `npm audit` and add lint to CI.
