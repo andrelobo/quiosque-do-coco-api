@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { StockMovement, StockMovementDocument, StockMovementType } from './stock.schema';
+import { StockMovement, StockMovementDocument } from './stock.schema';
 
 @Injectable()
 export class StockService {

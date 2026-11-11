@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsEnum, Min, Max } from 'class-validator';
+import { IsNumber, IsString, IsEnum, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CurrencyField } from '../common/pipes/currency-transform.pipe';
 

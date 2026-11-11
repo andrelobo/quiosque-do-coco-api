@@ -4,9 +4,9 @@ import { Model, Types, PipelineStage } from 'mongoose';
 import { Order, OrderDocument, OrderStatus } from '../orders/order.schema';
 import { Payment, PaymentDocument, PaymentStatus, PaymentMethod, CardType } from '../payments/payment.schema';
 import { Refund, RefundDocument } from '../refunds/refund.schema';
-import { Shift, ShiftDocument, ShiftStatus } from '../shifts/shift.schema';
+import { Shift, ShiftDocument } from '../shifts/shift.schema';
 import { Product, ProductDocument } from '../products/product.schema';
-import { StockMovement, StockMovementDocument, StockMovementType } from '../stock/stock.schema';
+import { StockMovement, StockMovementDocument } from '../stock/stock.schema';
 import { CashMovement, CashMovementDocument, CashMovementType } from '../cash/cash.schema';
 
 interface DateRange {

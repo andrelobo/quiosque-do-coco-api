@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Refund, RefundDocument } from './refund.schema';
 import { Payment, PaymentDocument, PaymentStatus } from '../payments/payment.schema';
-import { Order, OrderDocument, OrderStatus } from '../orders/order.schema';
+import { Order, OrderDocument } from '../orders/order.schema';
 import { AuditLog, AuditLogDocument } from '../common/audit/audit.schema';
 
 @Injectable()
