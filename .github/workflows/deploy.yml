@@ -25,7 +25,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           # A VPS tem 2 vCPU e ~1 GB de RAM; o build passa de 10 min em pico.
           command_timeout: 30m
-          script_stop: true
+          # O script já usa `set -e`; o ssh-action 1.2.5 não aceita mais script_stop.
           script: |
             set -e
             cd ${{ secrets.VPS_APP_DIR }}
