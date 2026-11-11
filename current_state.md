@@ -2,8 +2,8 @@
 
 ## Branch em andamento
 - Branch: `main` sincronizada com `origin/main`.
-- Correções de pagamento/estoque/CI mergeadas (PRs #4 e #5).
-- Alterações desta rodada (upgrade Nest 12) na branch `chore/upgrade-nest-12`, aguardando PR.
+- Upgrade Nest 12 mergeado (PR #16, `b400d2b`) e deploy validado em produção.
+- `script_stop` removido do workflow de deploy (PR #17, `e153735`); deploy seguinte passou sem o aviso do ssh-action.
 
 ## Builds e validações
 - `npm run build` (`nest build`) ✅
