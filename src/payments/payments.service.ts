@@ -30,8 +30,20 @@ export class PaymentsService {
   }) {
     const order = await this.orderModel.findById(data.orderId);
     if (!order) throw new NotFoundException('Pedido não encontrado');
-    if (order.status !== OrderStatus.AGUARDANDO_PAGAMENTO && order.status !== OrderStatus.EM_EDICAO) {
-      throw new BadRequestException('Pedido não está aguardando pagamento');
+    if (order.status !== OrderStatus.AGUARDANDO_PAGAMENTO) {
+      throw new BadRequestException('Pedido precisa estar aguardando pagamento para receber um pagamento');
+    }
+    if (order.shift.toString() !== data.shiftId.toString()) {
+      throw new BadRequestException('O turno do pagamento não corresponde ao turno do pedido');
+    }
+    // O valor é definido pelo pedido, nunca pelo cliente: impede cobrança a menor.
+    if (data.amount !== order.totalCents) {
+      throw new BadRequestException(
+        `Valor do pagamento (${data.amount}) difere do total do pedido (${order.totalCents})`,
+      );
+    }
+    if (data.method === PaymentMethod.CARTAO && !data.cardType) {
+      throw new BadRequestException('Informe o tipo do cartão (débito ou crédito)');
     }
 
     const existing = await this.paymentModel.findOne({
@@ -40,11 +52,16 @@ export class PaymentsService {
     });
     if (existing) throw new ConflictException('Já existe pagamento pendente ou confirmado para este pedido');
 
+    let received = data.amount;
     let change = 0;
     if (data.method === PaymentMethod.DINHEIRO) {
-      if (!data.received || data.received < data.amount) {
+      if (data.received === undefined || data.received === null) {
+        throw new BadRequestException('Informe o valor recebido em dinheiro');
+      }
+      if (data.received < data.amount) {
         throw new BadRequestException('Valor recebido insuficiente');
       }
+      received = data.received;
       change = data.received - data.amount;
     }
 
@@ -52,9 +69,9 @@ export class PaymentsService {
       order: data.orderId,
       shift: data.shiftId,
       method: data.method,
-      cardType: data.cardType,
+      cardType: data.method === PaymentMethod.CARTAO ? data.cardType : undefined,
       amountCents: data.amount,
-      receivedCents: data.received || data.amount,
+      receivedCents: received,
       changeCents: change,
       status: PaymentStatus.PENDENTE,
       reference: data.reference,
@@ -70,33 +87,19 @@ export class PaymentsService {
     return payment;
   }
 
+  // Delega a transição para o OrdersService, fonte única de verdade, que
+  // confirma o pagamento e libera o pedido. Erros NÃO são mais engolidos:
+  // se o pedido não puder ser liberado, a operação falha de forma explícita.
   async confirm(paymentId: string, userId: Types.ObjectId) {
     const payment = await this.paymentModel.findById(paymentId);
     if (!payment) throw new NotFoundException('Pagamento não encontrado');
-    if (payment.status === PaymentStatus.CONFIRMADO) {
-      throw new BadRequestException('Pagamento já confirmado');
-    }
     if (payment.status === PaymentStatus.NAO_CONFIRMADO) {
       throw new BadRequestException('Pagamento marcado como não confirmado');
     }
 
-    payment.status = PaymentStatus.CONFIRMADO;
-    payment.confirmedBy = userId;
-    payment.confirmedAt = new Date();
-    await payment.save();
+    await this.ordersService.confirmPayment(String(payment.order), userId);
 
-    await this.logAudit('payment.confirmed', 'Payment', payment._id, userId, {
-      order: payment.order,
-      method: payment.method,
-    });
-
-    try {
-      await this.ordersService.confirmPayment(String(payment.order), userId);
-    } catch (error) {
-      if (!(error instanceof BadRequestException)) throw error;
-    }
-
-    return payment;
+    return this.paymentModel.findById(paymentId);
   }
 
   async reject(paymentId: string, userId: Types.ObjectId, reason: string) {

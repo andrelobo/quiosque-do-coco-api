@@ -5,6 +5,7 @@ import { Product, ProductSchema } from '../products/product.schema';
 import { ShiftsService } from './shifts.service';
 import { ShiftsController } from './shifts.controller';
 import { ProductsModule } from '../products/products.module';
+import { ReportsModule } from '../reports/reports.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ProductsModule } from '../products/products.module';
       { name: Product.name, schema: ProductSchema },
     ]),
     ProductsModule,
+    ReportsModule,
   ],
   providers: [ShiftsService],
   controllers: [ShiftsController],

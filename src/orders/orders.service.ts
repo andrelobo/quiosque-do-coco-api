@@ -65,9 +65,9 @@ export class OrdersService {
       if (!product) throw new NotFoundException(`Produto ${item.productId} não encontrado`);
       if (!product.active) throw new BadRequestException(`Produto ${product.name} está inativo`);
       
-      // Verificar disponibilidade no turno
+      // O produto precisa estar disponível NO TURNO (não basta estar ativo no cadastro).
       const availability = shift.availability.find((a) => a.product.toString() === item.productId.toString());
-      if (availability && !availability.available) {
+      if (!availability || !availability.available) {
         throw new BadRequestException(`Produto ${product.name} não está disponível neste turno`);
       }
 
@@ -176,7 +176,7 @@ export class OrdersService {
       if (!product.active) throw new BadRequestException(`Produto ${product.name} está inativo`);
       
       const availability = shift.availability.find((a) => a.product.toString() === item.productId);
-      if (availability && !availability.available) {
+      if (!availability || !availability.available) {
         throw new BadRequestException(`Produto ${product.name} não disponível neste turno`);
       }
 
@@ -218,26 +218,63 @@ export class OrdersService {
       throw new BadRequestException('Pedido sem itens');
     }
 
-    // Reservar estoque
+    const shift = await this.shiftModel.findById(order.shift);
+    if (!shift || shift.status !== ShiftStatus.ABERTO) {
+      throw new BadRequestException('Turno não está aberto');
+    }
+
+    // Revalida a disponibilidade: o produto pode ter sido desativado no turno
+    // entre a edição e o envio para pagamento.
     for (const item of order.items) {
-      if (item.trackStock) {
-        const product = await this.productModel.findById(item.product);
-        if (product && product.trackStock) {
-        const productWithVirtual = product as ProductWithVirtual;
-        if (productWithVirtual.availableQty < item.qty) {
+      const availability = shift.availability.find(
+        (a) => a.product.toString() === item.product.toString(),
+      );
+      if (!availability || !availability.available) {
+        throw new BadRequestException(`Produto ${item.name} não está disponível neste turno`);
+      }
+    }
+
+    // Reserva atômica: o filtro só aceita o produto se ainda houver saldo
+    // disponível (stockQty - reservedQty >= qty). Evita corrida entre comandas.
+    const reserved: Array<{ product: Types.ObjectId; qty: number; name: string }> = [];
+    try {
+      for (const item of order.items) {
+        if (!item.trackStock) continue;
+
+        const updated = await this.productModel.findOneAndUpdate(
+          {
+            _id: item.product,
+            trackStock: true,
+            $expr: { $gte: [{ $subtract: ['$stockQty', '$reservedQty'] }, item.qty] },
+          },
+          { $inc: { reservedQty: item.qty } },
+          { new: true },
+        );
+        if (!updated) {
           throw new ConflictException(`Estoque insuficiente para ${item.name}`);
         }
+        reserved.push({ product: item.product, qty: item.qty, name: item.name });
       }
-        await this.productModel.findByIdAndUpdate(item.product, { $inc: { reservedQty: item.qty } });
-        await this.createStockMovement({
-          product: item.product,
-          type: StockMovementType.RESERVA,
-          qty: item.qty,
-          order: order._id,
-          reason: `Reserva para pedido ${order.code}`,
-          user: userId,
-        });
-      }
+    } catch (error) {
+      // Compensa tudo o que já foi reservado para não deixar saldo preso.
+      await Promise.allSettled(
+        reserved.map((r) =>
+          this.productModel.updateOne({ _id: r.product }, { $inc: { reservedQty: -r.qty } }),
+        ),
+      );
+      throw error;
+    }
+
+    // Só registra os movimentos depois que todas as reservas deram certo.
+    for (const r of reserved) {
+      await this.createStockMovement({
+        product: r.product,
+        type: StockMovementType.RESERVA,
+        qty: r.qty,
+        order: order._id,
+        reason: `Reserva para pedido ${order.code}`,
+        user: userId,
+      });
     }
 
     order.status = OrderStatus.AGUARDANDO_PAGAMENTO;
@@ -248,35 +285,62 @@ export class OrdersService {
     return order.populate('items.product');
   }
 
+  // Fonte única de verdade da confirmação de pagamento. É idempotente: pode ser
+  // chamada pelo PATCH /payments/:id/confirm e pelo POST /orders/:id/confirm-payment.
   async confirmPayment(orderId: string, userId: Types.ObjectId) {
     const order = await this.orderModel.findById(orderId);
     if (!order) throw new NotFoundException('Pedido não encontrado');
+
+    if (order.status === OrderStatus.CANCELADO) {
+      throw new BadRequestException('Pedido cancelado não pode ser confirmado');
+    }
+
+    // Pagamento já confirmado e pedido já liberado: apenas devolve o estado atual.
+    const alreadyPaid: OrderStatus[] = [
+      OrderStatus.PAGO,
+      OrderStatus.EM_PREPARO,
+      OrderStatus.PRONTO,
+      OrderStatus.ENTREGUE,
+    ];
+    if (alreadyPaid.includes(order.status)) {
+      return order.populate('items.product');
+    }
+
     if (order.status !== OrderStatus.AGUARDANDO_PAGAMENTO) {
       throw new BadRequestException('Pedido não está aguardando pagamento');
     }
 
-    // Verificar se existe pagamento confirmado
-    const payment = await this.paymentModel.findOne({ order: order._id, status: PaymentStatus.CONFIRMADO });
-    if (!payment) throw new BadRequestException('Nenhum pagamento confirmado para este pedido');
+    // Aceita pagamento pendente (confirma aqui) ou já confirmado (quando a
+    // chamada vem do PaymentsService), sempre liberando o pedido.
+    const payment = await this.paymentModel.findOne({
+      order: order._id,
+      status: { $in: [PaymentStatus.PENDENTE, PaymentStatus.CONFIRMADO] },
+    });
+    if (!payment) throw new BadRequestException('Nenhum pagamento registrado para este pedido');
 
-    order.status = OrderStatus.PAGO;
+    if (payment.status === PaymentStatus.PENDENTE) {
+      payment.status = PaymentStatus.CONFIRMADO;
+      payment.confirmedBy = userId;
+      payment.confirmedAt = new Date();
+      await payment.save();
+
+      await this.logAudit('payment.confirmed', 'Payment', payment._id, userId, {
+        order: order._id,
+        method: payment.method,
+      });
+    }
+
+    // Sem preparo: pronto para entrega. Com preparo: aguarda a cozinha.
+    // Em nenhum dos casos o estoque baixa aqui — só na entrega explícita.
+    const requiresPrep = order.items.some((item) => item.requiresPrep);
+    order.status = requiresPrep ? OrderStatus.PAGO : OrderStatus.PRONTO;
     order.paidAt = new Date();
     await order.save();
 
-    await this.logAudit('order.paid', 'Order', order._id, userId, { code: order.code });
-    
-    // Se não requer preparo, ir direto para entrega
-    const requiresPrep = order.items.some((i) => i.requiresPrep);
-    if (!requiresPrep) {
-      order.status = OrderStatus.ENTREGUE;
-      order.deliveredAt = new Date();
-      order.deliveredBy = userId;
-      await this.processDelivery(order, userId);
-    } else {
-      order.status = OrderStatus.EM_PREPARO;
-    }
-    await order.save();
-
+    await this.logAudit('order.paid', 'Order', order._id, userId, {
+      code: order.code,
+      payment: payment._id,
+    });
     return order.populate('items.product');
   }
 

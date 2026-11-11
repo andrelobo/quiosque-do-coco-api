@@ -8,6 +8,7 @@
     "start:prod": "node dist/main",
     "seed": "node dist/seed.js",
     "seed:full": "ts-node -r tsconfig-paths/register src/seed/cli.ts",
+    "smoke": "node scripts/smoke-sale-flow.mjs",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {

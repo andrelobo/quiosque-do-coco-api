@@ -3,12 +3,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Shift, ShiftDocument, ShiftStatus, ShiftAvailability } from './shift.schema';
 import { Product, ProductDocument } from '../products/product.schema';
+import { ReportsService } from '../reports/reports.service';
 
 @Injectable()
 export class ShiftsService {
   constructor(
     @InjectModel(Shift.name) private shiftModel: Model<ShiftDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    private readonly reportsService: ReportsService,
   ) {}
 
   async getNextNumber(): Promise<number> {
@@ -92,16 +94,17 @@ export class ShiftsService {
     if (!shift) throw new NotFoundException('Turno não encontrado');
     if (shift.status !== ShiftStatus.ABERTO) throw new BadRequestException('Turno já está fechado');
 
+    // Persiste o esperado e a diferença no momento do fechamento, para que o
+    // histórico não dependa de recálculo posterior.
+    const summary = await this.reportsService.cashSummary(data.shiftId);
     shift.status = ShiftStatus.FECHADO;
     shift.closedBy = data.closedBy;
     shift.closedAt = new Date();
     shift.countedCashCents = data.countedCash;
+    shift.expectedCashCents = summary.expectedCashCents;
+    shift.differenceCents = data.countedCash - summary.expectedCashCents;
     if (data.closingNotes) shift.closingNotes = data.closingNotes;
-    
-    return shift.save();
-  }
 
-  async setClosingCalculations(shiftId: string, expectedCashCents: number, differenceCents: number) {
-    return this.shiftModel.findByIdAndUpdate(shiftId, { expectedCashCents, differenceCents }, { new: true });
+    return shift.save();
   }
 }
