@@ -50,7 +50,7 @@ NestJS API for the Quiosque do Coco system, composed of:
   - `products.service.spec.ts`: valid adjustment, invalid qty, empty reason, unknown product, product without stock tracking and negative-balance guard;
   - `orders.service.spec.ts`: confirmation with/without prep, idempotency, order not awaiting payment, cancelled order and missing payment.
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` fixes and `npm run lint:check` only validates (0 problems).
-- **CI**: `.github/workflows/ci.yml` runs `npm ci`, `lint:check`, `test` and `build` on PRs and `main` (Node 22). API deploy now only runs after CI succeeds (`workflow_run`).
+- **CI**: `.github/workflows/ci.yml` runs `npm ci`, `lint:check`, `test` and `build` on PRs and `main` (Node 22) in `lint-test-build`; the `smoke` job boots the API against a MongoDB 7 service container with a disposable database (`quiosque_e2e`) and runs `npm run smoke`. API deploy now only runs after CI succeeds (`workflow_run`).
 - **Deploy**: `.github/workflows/deploy.yml` uses `appleboy/ssh-action` without `script_stop` (input removed in 1.2.5); the remote script already runs with `set -e`.
 - **Dependabot**: weekly npm updates (groups `@nestjs/*` and dev tooling) and monthly GitHub Actions updates.
 
@@ -64,7 +64,7 @@ NestJS API for the Quiosque do Coco system, composed of:
 
 ## P1 Pending (remaining)
 - `npm audit`: 7 dev-only moderate vulnerabilities (`typescript-eslint` → `minimatch`); no published fix yet. No high vulnerabilities. Revisit when `typescript-eslint` updates.
-- Real-database e2e tests (smoke covers the flow but does not run in CI because it needs Mongo).
+- E2E tests: covered by the `smoke` CI job (MongoDB 7 service container, disposable `quiosque_e2e` database).
 - `.env.production` is already removed from versioning/history; keep verifying the VPS deploy.
 
 ## Repository Git (server)

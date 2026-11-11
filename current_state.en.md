@@ -127,6 +127,7 @@
 - File: `server/scripts/smoke-sale-flow.mjs`
 - Command: `npm run smoke`
 - Variables: `API_URL` (default `http://localhost:4000`), `MONGODB_URI` (local default), `--keep` to skip cleanup.
+- Runs in CI (`smoke` job): MongoDB 7 service container, disposable `quiosque_e2e` database and the API started from `dist/main.js`.
 - Opens a shift automatically when none is open; in that case it also validates and deletes the shift at the end.
 - Covers: login; create order; payment before submit (400); mismatched amount (400); mismatched shift (400); card without type (400); cash with change; Pix; idempotent confirmation; `pronto`/`pago` status; stock reserve/release; cash summary; audit; persisted shift close; Mongo cleanup.
 
@@ -136,7 +137,5 @@
 - Optional old residue: cancelled order `6af461c2f6fa028bdd50c2e1` (pickup "Teste Regressao") + payment/logs.
 
 ## Next steps
-- Commit this round's changes and open a PR (no automatic push).
-- Major Nest upgrade (`@nestjs/cli@12`, `@nestjs/*@12`, `@nestjs/config@12`) on a dedicated branch to clear `npm audit`; validate with `test`, `build` and `smoke`.
-- Evaluate Mongo-backed e2e tests in CI (CI currently covers only unit tests).
 - Keep Dependabot active and review grouped PRs weekly.
+- Revisit `npm audit` when `typescript-eslint`/`minimatch` get a fix.

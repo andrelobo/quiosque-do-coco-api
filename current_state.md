@@ -127,6 +127,7 @@
 - Arquivo: `server/scripts/smoke-sale-flow.mjs`
 - Comando: `npm run smoke`
 - Variáveis: `API_URL` (padrão `http://localhost:4000`), `MONGODB_URI` (padrão local), `--keep` para não limpar.
+- Roda no CI (job `smoke`): Mongo 7 como service container, banco descartável `quiosque_e2e` e API iniciada a partir de `dist/main.js`.
 - Abre turno automaticamente se não houver nenhum aberto; nesse caso também valida e apaga o turno ao final.
 - Cobre: login; criar pedido; pagamento antes do submit (400); valor divergente (400); turno divergente (400); cartão sem tipo (400); dinheiro com troco; Pix; confirmação idempotente; status `pronto`/`pago`; reserva e liberação de estoque; resumo de caixa; auditoria; fechamento persistido; limpeza no Mongo.
 
@@ -136,7 +137,5 @@
 - Resíduo antigo opcional: pedido cancelado `6af461c2f6fa028bdd50c2e1` (pickup "Teste Regressao") + pagamento/logs.
 
 ## Próximos Passos
-- Commitar as alterações desta rodada e abrir PR (sem push automático).
-- Upgrade major do Nest (`@nestjs/cli@12`, `@nestjs/*@12`, `@nestjs/config@12`) em branch dedicada para zerar o `npm audit`; validar com `test`, `build` e `smoke`.
-- Avaliar testes e2e com Mongo em serviço no CI (hoje o CI cobre apenas unitários).
 - Manter Dependabot ativo e revisar PRs agrupados semanalmente.
+- Reavaliar o `npm audit` quando `typescript-eslint`/`minimatch` receberem correção.
