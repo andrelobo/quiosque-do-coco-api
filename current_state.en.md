@@ -92,6 +92,7 @@
 - `POST /auth/register` ✅ 404 (removed)
 
 ### Orders
+- Order reads (`findAll`, `findById`, `findByShift`, `findByCode`) populate `shift` with `{ number, id }`, required by the frontend to register payments in `/orders`.
 - `GET /orders?page=1&limit=10` ✅ `data` with string ids
 - `POST /orders` ✅ string id; product must be available in the shift
 - `POST /orders/:id/submit` ✅ atomic reservation and `aguardando_pagamento`

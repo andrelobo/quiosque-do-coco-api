@@ -92,6 +92,7 @@
 - `POST /auth/register` ✅ 404 (removido)
 
 ### Pedidos
+- Leituras (`findAll`, `findById`, `findByShift`, `findByCode`) populam `shift` com `{ number, id }`, necessário para o front registrar pagamento em `/orders`.
 - `GET /orders?page=1&limit=10` ✅ `data` com ids string
 - `POST /orders` ✅ id string; exige produto disponível no turno
 - `POST /orders/:id/submit` ✅ reserva atômica e status `aguardando_pagamento`
