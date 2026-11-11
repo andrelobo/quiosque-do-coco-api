@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { OrdersService } from './orders.service';
@@ -21,10 +22,10 @@ describe('OrdersService.confirmPayment', () => {
       status: OrderStatus.AGUARDANDO_PAGAMENTO,
       items: [{ requiresPrep: false, qty: 1 }],
       paidAt: undefined,
-      save: jest.fn().mockResolvedValue(true),
+      save: vi.fn().mockResolvedValue(true),
       ...overrides,
     };
-    doc.populate = jest.fn().mockResolvedValue(doc);
+    doc.populate = vi.fn().mockResolvedValue(doc);
     return doc;
   };
 
@@ -34,19 +35,19 @@ describe('OrdersService.confirmPayment', () => {
       _id: new Types.ObjectId(),
       status: PaymentStatus.PENDENTE,
       method: PaymentMethod.DINHEIRO,
-      save: jest.fn().mockResolvedValue(true),
+      save: vi.fn().mockResolvedValue(true),
     };
 
     orderModel = {
-      findById: jest.fn().mockResolvedValue(order),
+      findById: vi.fn().mockResolvedValue(order),
       db: {
         model: () => ({
           findById: () => ({ name: 'Administrador' }),
         }),
       },
     };
-    paymentModel = { findOne: jest.fn().mockResolvedValue(payment) };
-    auditLogModel = { create: jest.fn().mockResolvedValue({}) };
+    paymentModel = { findOne: vi.fn().mockResolvedValue(payment) };
+    auditLogModel = { create: vi.fn().mockResolvedValue({}) };
 
     service = new OrdersService(
       orderModel,

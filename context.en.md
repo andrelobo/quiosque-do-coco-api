@@ -53,8 +53,16 @@ NestJS API for the Quiosque do Coco system, composed of:
 - **CI**: `.github/workflows/ci.yml` runs `npm ci`, `lint:check`, `test` and `build` on PRs and `main`. API deploy now only runs after CI succeeds (`workflow_run`).
 - **Dependabot**: weekly npm updates (groups `@nestjs/*` and dev tooling) and monthly GitHub Actions updates.
 
+## Nest 12 upgrade (2026-11-11)
+- **Stack**: `@nestjs/common|core|platform-express` 12.4, `@nestjs/config` 12.1, `@nestjs/swagger` 12.1, `@nestjs/jwt` 12.0, `@nestjs/mongoose` 12.0, `@nestjs/passport` 12.0, `@nestjs/cli|schematics|testing` 12; TypeScript 6.0; Node 22.
+- **Nest 12 is ESM-only**: the build stays CommonJS and the runtime relies on Node's native `require(ESM)` (`>=22.12`). Dockerfile and CI moved from Node 20 to Node 22.
+- **Tests**: Jest/ts-jest replaced by Vitest 5 + `unplugin-swc` (esbuild does not emit `design:type`, required by Nest decorators and `@nestjs/mongoose`'s `SchemaFactory`). `jest.config.js` removed; specs use `vi.fn`.
+- **tsconfig**: `rootDir: ./src`, `include: ["src"]`, `types: ["node", "vitest/globals"]`, `ignoreDeprecations: "6.0"` (TS 6) and `strictPropertyInitialization: false` (schemas/DTOs without initializers).
+- **`npm audit`**: 7 moderate vulnerabilities left, all dev-only (`typescript-eslint` → `minimatch`); none high. The previous fixes required the Nest major upgrade.
+- **Validation**: `lint:check` ✅, `npm test` (13 tests) ✅, `nest build` ✅, `npm run smoke` ✅ on a disposable database, `docker build` + Node 22 container ✅ (including `/api/docs`).
+
 ## P1 Pending (remaining)
-- `npm audit`: 28 vulnerabilities (5 low, 12 moderate, 11 high). Fixes require major upgrades (`@nestjs/cli@12`, `@nestjs/*@12`, `@nestjs/config@12`); `npm audit fix --force` was not applied because it is breaking. Plan: dedicated Nest 11/12 upgrade branch validated with smoke + tests before merge.
+- `npm audit`: 7 dev-only moderate vulnerabilities (`typescript-eslint` → `minimatch`); no published fix yet. No high vulnerabilities. Revisit when `typescript-eslint` updates.
 - Real-database e2e tests (smoke covers the flow but does not run in CI because it needs Mongo).
 - `.env.production` is already removed from versioning/history; keep verifying the VPS deploy.
 

@@ -1,19 +1,22 @@
 # Quiosque do Coco - API (Server) - Estado Atual (11/11/2026)
 
 ## Branch em andamento
-- Branch: `main` sincronizada com `origin/main` (`a3fb4a7`).
-- PRs #3 (web) e #4 (API) mergeados; branches remotas de correção removidas.
-- Alterações desta rodada ainda **não commitadas** (ajuste de estoque, auditoria, testes, lint e CI).
+- Branch: `main` sincronizada com `origin/main`.
+- Correções de pagamento/estoque/CI mergeadas (PRs #4 e #5).
+- Alterações desta rodada (upgrade Nest 12) na branch `chore/upgrade-nest-12`, aguardando PR.
 
 ## Builds e validações
-- `npx tsc --noEmit -p tsconfig.json` ✅ (sem erros)
-- `npm run build` (`nest build`) ✅ (sem erros)
+- `npm run build` (`nest build`) ✅
 - `npm run lint:check` ✅ (0 erros, 0 warnings)
-- `npm test` ✅ (`2` suítes, `13` testes)
-- `cd web && npm run build` (`vite build`) ✅ (sem erros)
-- `npm run smoke` ✅ contra banco descartável `quiosque_smoke`
-- `npm run smoke` ✅ também contra o banco local (`quiosque`, turno #12 reutilizado)
-- Nenhum resíduo de teste: pedidos/pagamentos/movimentos/logs do smoke removidos; estoque restaurado (`Croissant` 4/0).
+- `npm test` ✅ Vitest (`2` suítes, `13` testes)
+- `npm run smoke` ✅ contra banco descartável
+- `docker build` + container Node 22 ✅ (`/api/docs` 200)
+- `npm audit`: 7 moderate dev-only, 0 high
+
+## Upgrade Nest 12 (11/11/2026)
+- Nest `common/core/platform-express` 12.4, `config` 12.1, `swagger` 12.1, `jwt` 12.0, `mongoose` 12.0, `passport` 12.0, `cli/schematics/testing` 12; TypeScript 6; Node 22 (CI e Dockerfile).
+- Nest 12 é ESM-only; o build segue CommonJS e o runtime usa `require(ESM)` nativo do Node `>=22.12`.
+- Jest/ts-jest → Vitest 5 + `unplugin-swc` (metadados de decorator); `jest.config.js` removido.
 
 ## Correções já mergeadas (PR #4)
 
