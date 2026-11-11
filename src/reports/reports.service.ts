@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, PipelineStage } from 'mongoose';
 import { Order, OrderDocument, OrderStatus } from '../orders/order.schema';
-import { Payment, PaymentDocument, PaymentStatus, PaymentMethod } from '../payments/payment.schema';
+import { Payment, PaymentDocument, PaymentStatus, PaymentMethod, CardType } from '../payments/payment.schema';
 import { Refund, RefundDocument } from '../refunds/refund.schema';
 import { Shift, ShiftDocument, ShiftStatus } from '../shifts/shift.schema';
 import { Product, ProductDocument } from '../products/product.schema';
@@ -124,6 +124,32 @@ export class ReportsService {
       else if (m._id === CashMovementType.RETIRADA) retiradas = m.total;
     }
 
+    // Recebimentos por modalidade (Pix e cartão não entram no caixa físico).
+    const byMethod = await this.paymentModel.aggregate([
+      { $match: { shift: new Types.ObjectId(shiftId), status: PaymentStatus.CONFIRMADO } },
+      {
+        $group: {
+          _id: { method: '$method', cardType: '$cardType' },
+          total: { $sum: '$amountCents' },
+        },
+      },
+    ]);
+    let pix = 0;
+    let card = 0;
+    let cardDebit = 0;
+    let cardCredit = 0;
+    let totalSales = 0;
+    for (const m of byMethod) {
+      totalSales += m.total;
+      if (m._id.method === PaymentMethod.PIX) {
+        pix += m.total;
+      } else if (m._id.method === PaymentMethod.CARTAO) {
+        card += m.total;
+        if (m._id.cardType === CardType.DEBITO) cardDebit += m.total;
+        else if (m._id.cardType === CardType.CREDITO) cardCredit += m.total;
+      }
+    }
+
     const expected = shift.initialCashCents + cashReceived + reforcos - retiradas - cashRefunded;
     const counted = shift.countedCashCents || 0;
     const difference = counted - expected;
@@ -135,6 +161,11 @@ export class ReportsService {
       cashRefundedCents: cashRefunded,
       reforcosCents: reforcos,
       retiradasCents: retiradas,
+      pixCents: pix,
+      cardCents: card,
+      cardDebitCents: cardDebit,
+      cardCreditCents: cardCredit,
+      totalSalesCents: totalSales,
       expectedCashCents: expected,
       countedCashCents: counted,
       differenceCents: difference,
