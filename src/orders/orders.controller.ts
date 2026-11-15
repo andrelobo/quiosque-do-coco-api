@@ -36,7 +36,7 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
+  @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
   @ApiOperation({ summary: 'Listar todos os pedidos (com paginação e busca)' })
   @ApiQuery({ name: 'status', required: false, enum: OrderStatus })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
