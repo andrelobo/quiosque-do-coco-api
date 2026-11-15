@@ -38,7 +38,7 @@ export class ShiftsController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL)
+  @Roles(UserRole.ADMIN, UserRole.RESPONSAVEL, UserRole.ATENDENTE)
   findAll() {
     return this.shiftsService.findAll();
   }

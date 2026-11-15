@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req } from '@nest
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UserRole } from './user.schema';
+import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from './users.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -16,7 +17,7 @@ export class UsersController {
   @Post()
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Criar usuário (apenas admin)' })
-  create(@Body() body: { name: string; username: string; password: string; role?: UserRole }) {
+  create(@Body() body: CreateUserDto) {
     return this.usersService.create(body);
   }
 
@@ -41,13 +42,13 @@ export class UsersController {
 
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  update(@Param('id') id: string, @Body() body: { name?: string; role?: UserRole; active?: boolean }) {
+  update(@Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.usersService.update(id, body);
   }
 
   @Patch(':id/password')
   @Roles(UserRole.ADMIN)
-  changePassword(@Param('id') id: string, @Body() body: { password: string }) {
+  changePassword(@Param('id') id: string, @Body() body: ChangePasswordDto) {
     return this.usersService.changePassword(id, body.password);
   }
 }

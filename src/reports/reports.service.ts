@@ -53,6 +53,19 @@ export class ReportsService {
         },
       },
       { $sort: { '_id.date': 1, '_id.shift': 1 } },
+      // Expõe os campos do agrupamento com nomes explícitos: o
+      // TransformInterceptor remove `_id` e, em `_id` objeto, o valor viraria
+      // a string "[object Object]".
+      {
+        $project: {
+          _id: 0,
+          date: '$_id.date',
+          shift: '$_id.shift',
+          orderCount: 1,
+          itemsSold: 1,
+          totalValue: 1,
+        },
+      },
     ];
     return this.orderModel.aggregate(pipeline);
   }
@@ -73,6 +86,7 @@ export class ReportsService {
         },
       },
       { $sort: { totalValue: -1 } },
+      { $project: { _id: 0, productId: '$_id', name: 1, qty: 1, totalValue: 1 } },
     ];
     return this.orderModel.aggregate(pipeline);
   }
@@ -90,6 +104,7 @@ export class ReportsService {
           totalValue: { $sum: '$amountCents' },
         },
       },
+      { $project: { _id: 0, method: '$_id', count: 1, totalValue: 1 } },
     ];
     return this.paymentModel.aggregate(pipeline);
   }
@@ -228,6 +243,7 @@ export class ReportsService {
       },
       {
         $project: {
+          _id: 0,
           product: '$_id',
           currentBalance: { $arrayElemAt: ['$movements.balanceAfter', -1] },
         },
