@@ -1,15 +1,16 @@
-# Quiosque do Coco - API (Server) - Current State (2026-11-11)
+# Quiosque do Coco - API (Server) - Current State (2026-11-16)
 
-## Work in progress
-- Branch: `main` synced with `origin/main`.
-- Nest 12 upgrade merged (PR #16, `b400d2b`) and deploy validated in production.
-- `script_stop` removed from the deploy workflow (PR #17, `e153735`); the following deploy ran without the ssh-action warning.
+## Current state
+- Branch `main` synced with `origin/main` at `455ba5b` (PR #22, no open branches).
+- Merged in order: #22 empty report dates (`455ba5b`), #21 accent-insensitive search + business-timezone reports (`db4716b`), #20 roles/permissions (`abecee1`), #19 smoke against real Mongo in CI (`1cde89b`).
+- The API deploy only runs after CI is green (`workflow_run`); the `455ba5b` run succeeded.
 
-## Builds and validation
+## Builds and validation (2026-11-16)
+- `npx vitest run` ✅ `6` suites, `35` tests
+- `npm run lint:check` ✅ (0 errors)
 - `npm run build` (`nest build`) ✅
-- `npm run lint:check` ✅ (0 errors, 0 warnings)
-- `npm test` ✅ Vitest (`2` suites, `13` tests)
-- `npm run smoke` ✅ against a disposable database
+- `npm run smoke` ✅ (CI `smoke` job, disposable MongoDB 7)
+- Deploy validated in production on SHA `455ba5b` (reports `?start=&end=` → 200)
 - `docker build` + Node 22 container ✅ (`/api/docs` 200)
 - `npm audit`: 7 dev-only moderate, 0 high
 
@@ -58,7 +59,7 @@
 - Restricted to `admin` and `responsavel`; validates ObjectId/dates.
 - `AuditService.log` fills `userName` from `userId`.
 
-## This round's deliveries (not committed)
+## Deliveries from 2026-11-11 (merged)
 
 ### Stock adjustment with movement and audit
 - `PATCH /products/:id/stock` (`ProductsService.adjustStock`):
@@ -73,11 +74,10 @@
 - Validated via API: `+5` ok; `-999` 409; `qty=0` 400; empty reason 400; no `trackStock` 409; movement and audit written.
 
 ### Automated tests
-- Jest + ts-jest (`jest.config.js`), no database dependency.
+- Vitest 5 + `unplugin-swc` (replaced Jest/ts-jest), no database dependency.
 - Scripts: `npm test`, `npm run test:watch`, `npm run test:cov`.
-- `src/products/products.service.spec.ts`: valid adjustment, invalid qty, empty reason, unknown product, no stock tracking and negative-balance guard.
-- `src/orders/orders.service.spec.ts`: confirmation with/without prep, idempotency, order not awaiting payment, cancelled and missing payment.
-- Result: `2` suites, `13` tests passing.
+- Suites: `products.service.spec.ts`, `orders.service.spec.ts`, `orders.service.search.spec.ts`, `reports.service.spec.ts`, `common/search/search-utils.spec.ts`, `common/time/business-time.spec.ts`.
+- Result on 2026-11-16: `6` suites, `35` tests passing.
 
 ### Lint and CI
 - ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint.
@@ -86,6 +86,21 @@
 - `.github/workflows/ci.yml`: `npm ci` + `lint:check` + `test` + `build` on PRs and `main`.
 - `.github/workflows/deploy.yml`: VPS deploy now only runs after CI succeeds (`workflow_run`), keeping `workflow_dispatch`.
 - `.github/dependabot.yml`: weekly npm (groups `@nestjs/*` and dev tooling) and monthly GitHub Actions.
+
+## Search and reports (2026-11-16)
+
+### Server-side order search
+- `GET /orders?status=&page=&limit=&search=` — filtering and pagination on the server (`page` minimum 1; `limit` between 1 and 100).
+- Term normalized (no accents, case-insensitive) and regex escaped by `buildSearchRegex`.
+- Numeric term (`12` or `#12`) matches **only** `code` — never `dayKey`, which is also numeric and would match every order.
+- Non-numeric term matches `pickupName`, `items.name`, `dayKey` and `code` through `$expr/$toString` (no `CastError`).
+- Before: searching `(` returned **500** (`CastError: Cast to number failed ... path "code"`).
+
+### Report rules
+- Sales count only paid orders: `SOLD_ORDER_STATUSES` = `PAGO`, `EM_PREPARO`, `PRONTO`, `ENTREGUE`.
+- Day filter and grouping use `BUSINESS_TIMEZONE` (`America/Sao_Paulo`).
+- Empty or blank `start`/`end` = "today" (the screen opens with `?start=&end=`); invalid format and start > end still return **400**.
+- Aggregations project `date`, `shift`, `productId`, `method` and `_id: 0`, avoiding `"[object Object]"` after `TransformInterceptor`.
 
 ## Endpoint status (API: http://localhost:4000)
 
@@ -96,7 +111,8 @@
 
 ### Orders
 - Order reads (`findAll`, `findById`, `findByShift`, `findByCode`) populate `shift` with `{ number, id }`, required by the frontend to register payments in `/orders`.
-- `GET /orders?page=1&limit=10` ✅ `data` with string ids
+- `GET /orders?page=1&limit=10&search=&status=` ✅ `data` + `total`/`totalPages` with string ids; server-side search
+- `GET /orders?search=(` ✅ 200 (used to be 500); numeric term matches `code` only
 - `POST /orders` ✅ string id; product must be available in the shift
 - `POST /orders/:id/submit` ✅ atomic reservation and `aguardando_pagamento`
 - `POST /orders/:id/confirm-payment` ✅ single source, idempotent
@@ -123,6 +139,14 @@
 - `GET /audit/logs` ✅ admin/responsible
 - `GET /audit/entity/:entity/:entityId` ✅ admin/responsible
 
+### Reports
+- `GET /reports/sales/period-shift` ✅ paid orders only, grouped by day/shift in the business timezone
+- `GET /reports/sales/by-product` ✅ same filter
+- `GET /reports/payments/by-method` ✅ same filter
+- `GET /reports/cancellations-refunds` ✅ empty period = today; invalid = 400
+- `GET /reports/orders/pending-delivery` ✅ admin/responsible/attendant
+- `GET /reports/stock` ✅ summary by type and balance per product (see Products and stock)
+
 ## Regression script
 - File: `server/scripts/smoke-sale-flow.mjs`
 - Command: `npm run smoke`
@@ -132,10 +156,11 @@
 - Covers: login; create order; payment before submit (400); mismatched amount (400); mismatched shift (400); card without type (400); cash with change; Pix; idempotent confirmation; `pronto`/`pago` status; stock reserve/release; cash summary; audit; persisted shift close; Mongo cleanup.
 
 ## Local data
-- `quiosque` database: open shift #12, 184 orders, 184 payments (no smoke residue).
-- Disposable `quiosque_smoke` database: dropped after validation.
+- `quiosque` database: 184 orders and 184 payments; no open shift at the moment (no smoke residue).
+- Disposable test databases (`quiosque_smoke`, `quiosque_search_e2e`, `quiosque_reports_e2e`): dropped after validation.
 - Optional old residue: cancelled order `6af461c2f6fa028bdd50c2e1` (pickup "Teste Regressao") + payment/logs.
 
 ## Next steps
 - Keep Dependabot active and review grouped PRs weekly.
 - Revisit `npm audit` when `typescript-eslint`/`minimatch` get a fix.
+- PDF report export: evaluated on 2026-11-16 (recommendation: "Print / PDF" button with print CSS); not implemented by client decision — revisit if needed.

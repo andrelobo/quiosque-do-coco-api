@@ -1,15 +1,16 @@
-# Quiosque do Coco - API (Server) - Estado Atual (11/11/2026)
+# Quiosque do Coco - API (Server) - Estado Atual (16/11/2026)
 
-## Branch em andamento
-- Branch: `main` sincronizada com `origin/main`.
-- Upgrade Nest 12 mergeado (PR #16, `b400d2b`) e deploy validado em produção.
-- `script_stop` removido do workflow de deploy (PR #17, `e153735`); deploy seguinte passou sem o aviso do ssh-action.
+## Estado atual
+- Branch: `main` sincronizada com `origin/main` em `455ba5b` (PR #22, sem branches abertas).
+- Mergeados nesta sequência: #22 datas vazias nos relatórios (`455ba5b`), #21 busca tolerante a acentos + relatórios no fuso (`db4716b`), #20 permissões/perfis (`abecee1`), #19 smoke com Mongo real no CI (`1cde89b`).
+- Deploy da API só roda depois do CI verde (`workflow_run`); o run do `455ba5b` concluiu com sucesso.
 
-## Builds e validações
+## Builds e validações (16/11/2026)
+- `npx vitest run` ✅ `6` suítes, `35` testes
+- `npm run lint:check` ✅ (0 erros)
 - `npm run build` (`nest build`) ✅
-- `npm run lint:check` ✅ (0 erros, 0 warnings)
-- `npm test` ✅ Vitest (`2` suítes, `13` testes)
-- `npm run smoke` ✅ contra banco descartável
+- `npm run smoke` ✅ (job `smoke` do CI, Mongo 7 descartável)
+- Deploy validado em produção no SHA `455ba5b` (relatórios `?start=&end=` → 200)
 - `docker build` + container Node 22 ✅ (`/api/docs` 200)
 - `npm audit`: 7 moderate dev-only, 0 high
 
@@ -58,7 +59,7 @@
 - Restritos a `admin` e `responsavel`; validam ObjectId/datas.
 - `AuditService.log` preenche `userName` a partir do `userId`.
 
-## Entregas desta rodada (não commitadas)
+## Entregas de 11/11/2026 (mergeadas)
 
 ### Ajuste de estoque com movimentação e auditoria
 - `PATCH /products/:id/stock` (`ProductsService.adjustStock`):
@@ -73,11 +74,10 @@
 - Validado via API: `+5` ok; `-999` 409; `qty=0` 400; motivo vazio 400; sem `trackStock` 409; movimento e auditoria gravados.
 
 ### Testes automatizados
-- Jest + ts-jest (`jest.config.js`), sem dependência de banco.
+- Vitest 5 + `unplugin-swc` (substituiu Jest/ts-jest), sem dependência de banco.
 - Scripts: `npm test`, `npm run test:watch`, `npm run test:cov`.
-- `src/products/products.service.spec.ts`: ajuste válido, qty inválida, motivo vazio, produto inexistente, sem controle de estoque e bloqueio de saldo negativo.
-- `src/orders/orders.service.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, cancelado e sem pagamento.
-- Resultado: `2` suítes, `13` testes passando.
+- Suítes: `products.service.spec.ts`, `orders.service.spec.ts`, `orders.service.search.spec.ts`, `reports.service.spec.ts`, `common/search/search-utils.spec.ts`, `common/time/business-time.spec.ts`.
+- Resultado em 16/11/2026: `6` suítes, `35` testes passando.
 
 ### Lint e CI
 - ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint.
@@ -86,6 +86,21 @@
 - `.github/workflows/ci.yml`: `npm ci` + `lint:check` + `test` + `build` em PRs e no `main`.
 - `.github/workflows/deploy.yml`: deploy da VPS agora só roda após o CI concluir com sucesso (`workflow_run`), mantendo `workflow_dispatch`.
 - `.github/dependabot.yml`: npm semanal (grupos `@nestjs/*` e dev tooling) e GitHub Actions mensal.
+
+## Busca e relatórios (16/11/2026)
+
+### Busca de pedidos no servidor
+- `GET /orders?status=&page=&limit=&search=` — filtro e paginação no servidor (`page` mínimo 1; `limit` entre 1 e 100).
+- Termo normalizado (sem acento, sem caixa) e regex escapado por `buildSearchRegex`.
+- Termo numérico (`12` ou `#12`) casa **somente** `code` — nunca `dayKey`, que também é numérico e faria todo pedido casar.
+- Termo não numérico casa `pickupName`, `items.name`, `dayKey` e `code` via `$expr/$toString` (sem `CastError`).
+- Antes: buscar `(` devolvia **500** (`CastError: Cast to number failed ... path "code"`).
+
+### Regras de relatórios
+- Vendas contam apenas pedidos pagos: `SOLD_ORDER_STATUSES` = `PAGO`, `EM_PREPARO`, `PRONTO`, `ENTREGUE`.
+- Filtro de dia e agrupamento usam o fuso `BUSINESS_TIMEZONE` (`America/Sao_Paulo`).
+- `start`/`end` vazios ou só com espaços = "hoje" (a tela abre com `?start=&end=`); formato inválido e início > fim continuam em **400**.
+- Agregações projetam `date`, `shift`, `productId`, `method` e `_id: 0`, evitando `"[object Object]"` após o `TransformInterceptor`.
 
 ## Status dos Endpoints (API: http://localhost:4000)
 
@@ -96,7 +111,8 @@
 
 ### Pedidos
 - Leituras (`findAll`, `findById`, `findByShift`, `findByCode`) populam `shift` com `{ number, id }`, necessário para o front registrar pagamento em `/orders`.
-- `GET /orders?page=1&limit=10` ✅ `data` com ids string
+- `GET /orders?page=1&limit=10&search=&status=` ✅ `data` + `total`/`totalPages` com ids string; busca no servidor
+- `GET /orders?search=(` ✅ 200 (antes 500); termo numérico casa só `code`
 - `POST /orders` ✅ id string; exige produto disponível no turno
 - `POST /orders/:id/submit` ✅ reserva atômica e status `aguardando_pagamento`
 - `POST /orders/:id/confirm-payment` ✅ fonte única, idempotente
@@ -123,6 +139,14 @@
 - `GET /audit/logs` ✅ admin/responsável
 - `GET /audit/entity/:entity/:entityId` ✅ admin/responsável
 
+### Relatórios
+- `GET /reports/sales/period-shift` ✅ só pedidos pagos, agrupado por dia/turno no fuso do negócio
+- `GET /reports/sales/by-product` ✅ idem
+- `GET /reports/payments/by-method` ✅ idem
+- `GET /reports/cancellations-refunds` ✅ período vazio = hoje; inválido = 400
+- `GET /reports/orders/pending-delivery` ✅ admin/responsável/atendente
+- `GET /reports/stock` ✅ resumo por tipo e saldo por produto (ver Produtos e estoque)
+
 ## Script de regressão
 - Arquivo: `server/scripts/smoke-sale-flow.mjs`
 - Comando: `npm run smoke`
@@ -132,10 +156,11 @@
 - Cobre: login; criar pedido; pagamento antes do submit (400); valor divergente (400); turno divergente (400); cartão sem tipo (400); dinheiro com troco; Pix; confirmação idempotente; status `pronto`/`pago`; reserva e liberação de estoque; resumo de caixa; auditoria; fechamento persistido; limpeza no Mongo.
 
 ## Dados locais
-- Banco `quiosque`: turno #12 aberto, 184 pedidos, 184 pagamentos (nenhum resíduo de smoke).
-- Banco descartável `quiosque_smoke`: dropado após a validação.
+- Banco `quiosque`: 184 pedidos e 184 pagamentos; nenhum turno aberto no momento (nenhum resíduo de smoke).
+- Bancos descartáveis de teste (`quiosque_smoke`, `quiosque_search_e2e`, `quiosque_reports_e2e`): dropados após a validação.
 - Resíduo antigo opcional: pedido cancelado `6af461c2f6fa028bdd50c2e1` (pickup "Teste Regressao") + pagamento/logs.
 
 ## Próximos Passos
 - Manter Dependabot ativo e revisar PRs agrupados semanalmente.
 - Reavaliar o `npm audit` quando `typescript-eslint`/`minimatch` receberem correção.
+- Exportação de relatórios em PDF: avaliada em 16/11/2026 (recomendação: botão "Imprimir / PDF" com CSS de impressão); não implementada por decisão do cliente — retomar se houver demanda.
