@@ -37,9 +37,14 @@ export class ReportsService {
   // "hoje" começava às 21h do dia anterior no horário local.
   private getDateRange(start?: string, end?: string): DateRange {
     try {
+      // A tela abre chamando `?start=&end=` (campos vazios), então string vazia
+      // significa "sem filtro" e deve cair no dia de hoje — não é data inválida.
+      const cleanStart = start?.trim() || undefined;
+      const cleanEnd = end?.trim() || undefined;
+
       const today = businessDayKey();
-      const endKey = end ?? start ?? today;
-      const startKey = start ?? endKey;
+      const endKey = cleanEnd ?? cleanStart ?? today;
+      const startKey = cleanStart ?? endKey;
 
       parseDayKey(startKey);
       parseDayKey(endKey);
