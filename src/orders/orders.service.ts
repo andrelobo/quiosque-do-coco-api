@@ -7,6 +7,8 @@ import { Shift, ShiftDocument, ShiftStatus } from '../shifts/shift.schema';
 import { Payment, PaymentDocument, PaymentStatus } from '../payments/payment.schema';
 import { StockMovement, StockMovementDocument, StockMovementType } from '../stock/stock.schema';
 import { AuditLog, AuditLogDocument } from '../common/audit/audit.schema';
+import { buildSearchRegex, normalizeSearchTerm } from '../common/search/search-utils';
+import { businessDayKey } from '../common/time/business-time';
 import { UserRole } from '../users/user.schema';
 
 interface ProductWithVirtual extends ProductDocument {
@@ -25,8 +27,8 @@ export class OrdersService {
   ) {}
 
   private generateDayKey(): string {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // Fuso do negócio (não UTC): o código do dia não pode reiniciar às 21h.
+    return businessDayKey();
   }
 
   // O código do pedido é único por dia (índice dayKey + code) e não por turno:
@@ -144,14 +146,41 @@ export class OrdersService {
   async findAll(status?: OrderStatus, page = 1, limit = 10, search?: string) {
     const filter: any = {};
     if (status) filter.status = status;
-    if (search) {
-      filter.$or = [
-        { code: { $regex: search, $options: 'i' } },
-        { dayKey: { $regex: search, $options: 'i' } },
-        { pickupName: { $regex: search, $options: 'i' } },
+
+    const term = normalizeSearchTerm(search);
+    if (term) {
+      const pattern = buildSearchRegex(term);
+      const numeric = /^\d+$/.test(term);
+      const conditions: any[] = [
+        { pickupName: { $regex: pattern, $options: 'i' } },
+        { 'items.name': { $regex: pattern, $options: 'i' } },
       ];
+
+      if (numeric) {
+        // Busca só por número (ex.: "12" ou "#12") é código do pedido. O
+        // dayKey também é numérico ("2026-11-16") e faria todo pedido casar.
+        conditions.push({ code: Number(term) });
+      } else {
+        conditions.push({ dayKey: { $regex: pattern, $options: 'i' } });
+        // `code` é numérico: $regex direto nele faz o Mongoose tentar converter
+        // as opções para número e derrubar a requisição com CastError (500).
+        conditions.push({
+          $expr: {
+            $regexMatch: {
+              input: { $toString: '$code' },
+              regex: pattern,
+              options: 'i',
+            },
+          },
+        });
+      }
+
+      filter.$or = conditions;
     }
-    const skip = (page - 1) * limit;
+
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 10));
+    const skip = (safePage - 1) * safeLimit;
     const [data, total] = await Promise.all([
       this.orderModel
         .find(filter)
@@ -159,11 +188,17 @@ export class OrdersService {
         .populate('shift', 'number')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit)
+        .limit(safeLimit)
         .lean(),
       this.orderModel.countDocuments(filter),
     ]);
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return {
+      data,
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    };
   }
 
   async findByCode(dayKey: string, code: number) {

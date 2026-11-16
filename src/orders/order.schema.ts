@@ -84,6 +84,15 @@ export class Order {
   stockReserved: boolean;
 }
 
+// Status em que a venda já foi efetivamente paga. Relatórios de venda devem
+// considerar apenas estes: pedidos em edição/aguardando pagamento não são venda.
+export const SOLD_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.PAGO,
+  OrderStatus.EM_PREPARO,
+  OrderStatus.PRONTO,
+  OrderStatus.ENTREGUE,
+];
+
 export const OrderSchema = SchemaFactory.createForClass(Order);
 OrderSchema.index({ dayKey: 1, code: 1 }, { unique: true });
 OrderSchema.index({ shift: 1, status: 1 });
