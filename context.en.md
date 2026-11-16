@@ -46,9 +46,11 @@ NestJS API for the Quiosque do Coco system, composed of:
   - writes a `StockMovement` of type `ajuste` with `balanceAfter`, reason and user;
   - writes an audit entry `product.stock.adjusted` with `previousQty`/`balanceAfter` in `meta`.
 - **Audit**: `AuditService.log` resolves `userName` from `userId` when the name is not provided.
-- **Automated tests**: Jest + ts-jest (no database), 13 tests across 2 suites:
+- **Automated tests**: Vitest 5 + `unplugin-swc` (replaced Jest/ts-jest), no database, `6` suites and `35` tests (2026-11-16):
   - `products.service.spec.ts`: valid adjustment, invalid qty, empty reason, unknown product, product without stock tracking and negative-balance guard;
-  - `orders.service.spec.ts`: confirmation with/without prep, idempotency, order not awaiting payment, cancelled order and missing payment.
+  - `orders.service.spec.ts` and `orders.service.search.spec.ts`: confirmation with/without prep, idempotency, order not awaiting payment, cancelled order, missing payment and search;
+  - `reports.service.spec.ts`: paid sales, business timezone, empty/invalid dates;
+  - `common/search/search-utils.spec.ts` and `common/time/business-time.spec.ts`: utilities.
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` fixes and `npm run lint:check` only validates (0 problems).
 - **CI**: `.github/workflows/ci.yml` runs `npm ci`, `lint:check`, `test` and `build` on PRs and `main` (Node 22) in `lint-test-build`; the `smoke` job boots the API against a MongoDB 7 service container with a disposable database (`quiosque_e2e`) and runs `npm run smoke`. API deploy now only runs after CI succeeds (`workflow_run`).
 - **Deploy**: `.github/workflows/deploy.yml` uses `appleboy/ssh-action` without `script_stop` (input removed in 1.2.5); the remote script already runs with `set -e`.
@@ -60,7 +62,16 @@ NestJS API for the Quiosque do Coco system, composed of:
 - **Tests**: Jest/ts-jest replaced by Vitest 5 + `unplugin-swc` (esbuild does not emit `design:type`, required by Nest decorators and `@nestjs/mongoose`'s `SchemaFactory`). `jest.config.js` removed; specs use `vi.fn`.
 - **tsconfig**: `rootDir: ./src`, `include: ["src"]`, `types: ["node", "vitest/globals"]`, `ignoreDeprecations: "6.0"` (TS 6) and `strictPropertyInitialization: false` (schemas/DTOs without initializers).
 - **`npm audit`**: 7 moderate vulnerabilities left, all dev-only (`typescript-eslint` → `minimatch`); none high. The previous fixes required the Nest major upgrade.
-- **Validation**: `lint:check` ✅, `npm test` (13 tests) ✅, `nest build` ✅, `npm run smoke` ✅ on a disposable database, `docker build` + Node 22 container ✅ (including `/api/docs`).
+- **Validation**: `lint:check` ✅, `npm test` (35 tests) ✅, `nest build` ✅, `npm run smoke` ✅ on a disposable database, `docker build` + Node 22 container ✅ (including `/api/docs`).
+
+## Search and reports (2026-11-16)
+- **Server-side order search**: `GET /orders` accepts `search` alongside `status`/`page`/`limit`. The term is normalized (no accents/case) and the regex is escaped (`common/search/search-utils.ts`).
+  - Numeric term (`12`/`#12`) matches **only** `code`; `dayKey` is also numeric and would match every order.
+  - Non-numeric term matches `pickupName`, `items.name`, `dayKey` and `code` via `$expr` + `$toString` — `$regex` directly on a numeric field threw `CastError` (500).
+  - Sanitized pagination (`page >= 1`, `limit` 1–100) and a response with `data`, `total` and `totalPages`.
+- **Reports**: sales count only `SOLD_ORDER_STATUSES` (`PAGO`, `EM_PREPARO`, `PRONTO`, `ENTREGUE`); filter/grouping in `BUSINESS_TIMEZONE`.
+- **Empty dates**: empty or blank `start`/`end` fall back to the current day (the screen opens with `?start=&end=`); invalid format and start > end still return 400.
+- **Business timezone**: `common/time/business-time.ts` centralizes `businessDayKey`, `businessDayRange`, `parseDayKey` and `getBusinessTimezone`, used by orders, shifts and reports.
 
 ## P1 Pending (remaining)
 - `npm audit`: 7 dev-only moderate vulnerabilities (`typescript-eslint` → `minimatch`); no published fix yet. No high vulnerabilities. Revisit when `typescript-eslint` updates.

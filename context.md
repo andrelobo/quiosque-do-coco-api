@@ -46,9 +46,11 @@ API NestJS para o sistema Quiosque do Coco, composta por:
   - grava `StockMovement` do tipo `ajuste` com `balanceAfter`, motivo e usuário;
   - grava auditoria `product.stock.adjusted` com `previousQty`/`balanceAfter` no `meta`.
 - **Auditoria**: `AuditService.log` resolve `userName` a partir do `userId` quando o nome não é informado.
-- **Testes automatizados**: Jest + ts-jest (sem banco), com 13 testes em 2 suítes:
+- **Testes automatizados**: Vitest 5 + `unplugin-swc` (substituiu Jest/ts-jest), sem banco, com `6` suítes e `35` testes (16/11/2026):
   - `products.service.spec.ts`: ajuste válido, qty inválida, motivo vazio, produto inexistente, produto sem controle de estoque e bloqueio de saldo negativo;
-  - `orders.service.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, pedido cancelado e ausência de pagamento.
+  - `orders.service.spec.ts` e `orders.service.search.spec.ts`: confirmação sem/com preparo, idempotência, pedido fora de `aguardando_pagamento`, pedido cancelado, ausência de pagamento e busca;
+  - `reports.service.spec.ts`: vendas pagas, fuso do negócio, datas vazias/inválidas;
+  - `common/search/search-utils.spec.ts` e `common/time/business-time.spec.ts`: utilitários.
 - **Lint**: ESLint 9 flat config (`eslint.config.mjs`) + typescript-eslint; `npm run lint` corrige e `npm run lint:check` só valida (0 problemas).
 - **CI**: `.github/workflows/ci.yml` roda `npm ci`, `lint:check`, `test` e `build` em PRs e no `main` (Node 22) em `lint-test-build`; o job `smoke` sobe a API com Mongo 7 como service container em banco descartável (`quiosque_e2e`) e roda `npm run smoke`. O deploy da API agora só dispara após o CI concluir com sucesso (`workflow_run`).
 - **Deploy**: `.github/workflows/deploy.yml` usa `appleboy/ssh-action` sem `script_stop` (entrada removida na 1.2.5); o script remoto já roda com `set -e`.
@@ -60,7 +62,16 @@ API NestJS para o sistema Quiosque do Coco, composta por:
 - **Testes**: Jest/ts-jest substituídos por Vitest 5 + `unplugin-swc` (o esbuild não emite `design:type`, necessário para os decorators do Nest e para o `SchemaFactory` do `@nestjs/mongoose`). `jest.config.js` removido; specs usam `vi.fn`.
 - **tsconfig**: `rootDir: ./src`, `include: ["src"]`, `types: ["node", "vitest/globals"]`, `ignoreDeprecations: "6.0"` (TS 6) e `strictPropertyInitialization: false` (schemas/DTOs sem inicializador).
 - **`npm audit`**: 7 vulnerabilidades moderate restantes, todas dev-only (`typescript-eslint` → `minimatch`); nenhuma high. As correções anteriores exigiam o upgrade major do Nest.
-- **Validação**: `lint:check` ✅, `npm test` (13 testes) ✅, `nest build` ✅, `npm run smoke` ✅ em banco descartável, `docker build` + container em Node 22 ✅ (inclui `/api/docs`).
+- **Validação**: `lint:check` ✅, `npm test` (35 testes) ✅, `nest build` ✅, `npm run smoke` ✅ em banco descartável, `docker build` + container em Node 22 ✅ (inclui `/api/docs`).
+
+## Busca e relatórios (16/11/2026)
+- **Busca de pedidos no servidor**: `GET /orders` aceita `search` além de `status`/`page`/`limit`. O termo é normalizado (sem acento/caixa) e o regex é escapado (`common/search/search-utils.ts`).
+  - Termo numérico (`12`/`#12`) casa **somente** `code`; `dayKey` também é numérico e faria todo pedido casar.
+  - Termo não numérico casa `pickupName`, `items.name`, `dayKey` e `code` via `$expr` + `$toString` — `$regex` direto em campo numérico gerava `CastError` (500).
+  - Paginação saneada (`page >= 1`, `limit` 1–100) e resposta com `data`, `total` e `totalPages`.
+- **Relatórios**: vendas contam só `SOLD_ORDER_STATUSES` (`PAGO`, `EM_PREPARO`, `PRONTO`, `ENTREGUE`); filtro/agrupamento no fuso `BUSINESS_TIMEZONE`.
+- **Datas vazias**: `start`/`end` vazios ou só com espaços caem no dia corrente (a tela abre com `?start=&end=`); formato inválido e início > fim continuam em 400.
+- **Fuso do negócio**: `common/time/business-time.ts` concentra `businessDayKey`, `businessDayRange`, `parseDayKey` e `getBusinessTimezone`, usado por pedidos, turnos e relatórios.
 
 ## P1 Pendentes (restantes)
 - `npm audit`: 7 vulnerabilidades moderate dev-only (`typescript-eslint` → `minimatch`); não há correção publicada ainda. Sem vulnerabilidades high. Reavaliar quando o `typescript-eslint` atualizar.
