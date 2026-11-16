@@ -1,13 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, PipelineStage } from 'mongoose';
-import { Order, OrderDocument, OrderStatus } from '../orders/order.schema';
+import { Order, OrderDocument, OrderStatus, SOLD_ORDER_STATUSES } from '../orders/order.schema';
 import { Payment, PaymentDocument, PaymentStatus, PaymentMethod, CardType } from '../payments/payment.schema';
 import { Refund, RefundDocument } from '../refunds/refund.schema';
 import { Shift, ShiftDocument } from '../shifts/shift.schema';
 import { Product, ProductDocument } from '../products/product.schema';
 import { StockMovement, StockMovementDocument } from '../stock/stock.schema';
 import { CashMovement, CashMovementDocument, CashMovementType } from '../cash/cash.schema';
+import {
+  businessDayKey,
+  businessDayRange,
+  getBusinessTimezone,
+  parseDayKey,
+} from '../common/time/business-time';
 
 interface DateRange {
   start: Date;
@@ -26,12 +32,28 @@ export class ReportsService {
     @InjectModel(CashMovement.name) private cashMovementModel: Model<CashMovementDocument>,
   ) {}
 
+  // As datas chegam como YYYY-MM-DD (input date do site) e representam o dia
+  // no fuso do negócio. Antes elas eram interpretadas em UTC e o filtro
+  // "hoje" começava às 21h do dia anterior no horário local.
   private getDateRange(start?: string, end?: string): DateRange {
-    const startDate = start ? new Date(start) : new Date();
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = end ? new Date(end) : new Date();
-    endDate.setHours(23, 59, 59, 999);
-    return { start: startDate, end: endDate };
+    try {
+      const today = businessDayKey();
+      const endKey = end ?? start ?? today;
+      const startKey = start ?? endKey;
+
+      parseDayKey(startKey);
+      parseDayKey(endKey);
+
+      const { start: startDate } = businessDayRange(startKey);
+      const { end: endDate } = businessDayRange(endKey);
+      if (startDate.getTime() > endDate.getTime()) {
+        throw new BadRequestException('Data inicial não pode ser posterior à data final');
+      }
+      return { start: startDate, end: endDate };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException('Data inválida: use o formato YYYY-MM-DD');
+    }
   }
 
   // 1. Vendas por período e turno
@@ -39,14 +61,23 @@ export class ReportsService {
     const { start: startDate, end: endDate } = this.getDateRange(start, end);
     
     const pipeline: PipelineStage[] = [
-      { $match: { createdAt: { $gte: startDate, $lte: endDate }, status: { $ne: OrderStatus.CANCELADO } } },
+      { $match: { createdAt: { $gte: startDate, $lte: endDate }, status: { $in: SOLD_ORDER_STATUSES } } },
       {
         $lookup: { from: 'shifts', localField: 'shift', foreignField: '_id', as: 'shiftInfo' },
       },
       { $unwind: '$shiftInfo' },
       {
         $group: {
-          _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, shift: '$shiftInfo.number' },
+          _id: {
+            date: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt',
+                timezone: getBusinessTimezone(),
+              },
+            },
+            shift: '$shiftInfo.number',
+          },
           orderCount: { $sum: 1 },
           itemsSold: { $sum: { $sum: '$items.qty' } },
           totalValue: { $sum: '$totalCents' },
@@ -75,7 +106,7 @@ export class ReportsService {
     const { start: startDate, end: endDate } = this.getDateRange(start, end);
     
     const pipeline: PipelineStage[] = [
-      { $match: { createdAt: { $gte: startDate, $lte: endDate }, status: { $ne: OrderStatus.CANCELADO } } },
+      { $match: { createdAt: { $gte: startDate, $lte: endDate }, status: { $in: SOLD_ORDER_STATUSES } } },
       { $unwind: '$items' },
       {
         $group: {

@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Shift, ShiftDocument, ShiftStatus, ShiftAvailability } from './shift.schema';
 import { Product, ProductDocument } from '../products/product.schema';
+import { businessDayKey, businessDayRange } from '../common/time/business-time';
 import { ReportsService } from '../reports/reports.service';
 
 @Injectable()
@@ -14,13 +15,11 @@ export class ShiftsService {
   ) {}
 
   async getNextNumber(): Promise<number> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Numeração diária no fuso do negócio, não no UTC do container.
+    const { start, endExclusive } = businessDayRange(businessDayKey());
 
     const count = await this.shiftModel.countDocuments({
-      openedAt: { $gte: today, $lt: tomorrow },
+      openedAt: { $gte: start, $lt: endExclusive },
     });
     return count + 1;
   }
