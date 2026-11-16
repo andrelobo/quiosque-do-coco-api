@@ -54,6 +54,16 @@ describe('ReportsService — relatórios de venda', () => {
     expect(firstPipeline()[0].$match.status).toEqual({ $in: SOLD_ORDER_STATUSES });
   });
 
+  it('trata datas vazias como "hoje" (a tela abre com ?start=&end=)', async () => {
+    await service.salesByPeriodAndShift('', '');
+    await service.salesByPeriodAndShift('   ', '');
+
+    const { createdAt } = firstPipeline()[0].$match;
+    const hours = (createdAt.$lte.getTime() - createdAt.$gte.getTime()) / 3_600_000;
+    expect(hours).toBeGreaterThan(22);
+    expect(hours).toBeLessThan(26);
+  });
+
   it('rejeita data em formato inválido com 400', async () => {
     await expect(service.salesByPeriodAndShift('16/11/2026')).rejects.toBeInstanceOf(
       BadRequestException,
