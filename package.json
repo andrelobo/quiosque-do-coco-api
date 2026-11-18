@@ -40,7 +40,7 @@
     "@nestjs/testing": "^12.4.2",
     "@types/cookie-parser": "^1.4.7",
     "@types/express": "^5.0.6",
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.6.6",
     "@types/passport-jwt": "^4.0.1",
     "@vitest/coverage-v8": "^5.1.0",
     "@swc/core": "^1.16.22",
